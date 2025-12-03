@@ -54,8 +54,11 @@ python -m venv .venv
 .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # macOS/Linux
 
-# 의존성 설치
+# Python 의존성 설치
 pip install -r ecojourney/requirements.txt
+
+# Node.js 의존성 설치 (react-player 등)
+npm install
 ```
 
 ### 2. 환경 변수 설정
