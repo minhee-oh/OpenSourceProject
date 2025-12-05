@@ -7,16 +7,39 @@ from typing import Dict, Any
 def report_page() -> rx.Component:
     """
     최종 탄소 발자국 리포트 페이지 컴포넌트입니다.
+    페이지 로드 시 자동으로 탄소 배출량을 계산합니다.
     """
+    # 페이지 로드 시 자동으로 계산 수행 (조건부 렌더링으로 트리거)
+    # 리포트 페이지가 렌더링될 때 계산이 안 되어 있으면 자동으로 계산
     return rx.center(
         rx.vstack(
             rx.heading("🌍 탄소 발자국 측정 결과", size="7", margin_bottom="20px"),
             
+            # 계산 버튼 (수동 재계산용)
+            rx.cond(
+                ~AppState.is_report_calculated,
+                rx.button(
+                    "📊 탄소 배출량 계산하기",
+                    on_click=AppState.calculate_report,
+                    color_scheme="blue",
+                    size="3",
+                    margin_bottom="20px"
+                ),
+            ),
+            
             # 1. 계산 상태 확인
             rx.cond(
                 AppState.is_report_calculated,
-                rx.text("✅ 최종 계산이 완료되었습니다.", color="green.700", size="5"),
-                rx.text("⏳ 계산이 완료되지 않았습니다.", color="orange.700", size="5"),
+                rx.vstack(
+                    rx.text("✅ 최종 계산이 완료되었습니다.", color="green.700", size="5"),
+                    rx.text(
+                        f"총 {AppState.all_activities.length()}개의 활동이 계산되었습니다.",
+                        color="gray.600",
+                        size="3"
+                    ),
+                    spacing="2"
+                ),
+                rx.text("⏳ 계산이 완료되지 않았습니다. 위 버튼을 클릭하여 계산하세요.", color="orange.700", size="5"),
             ),
             
             rx.divider(margin_y="20px"),
@@ -34,8 +57,56 @@ def report_page() -> rx.Component:
             
             # 3. 상세 내역 (데이터 개수 확인)
             rx.text(
-                f"총 활동 기록 수: {AppState.all_activities.length}", 
+                f"총 활동 기록 수: {AppState.all_activities.length()}",
                 color="gray.600"
+            ),
+            
+            rx.divider(margin_y="20px"),
+            
+            # 4. 상세 계산 내역 표시
+            rx.cond(
+                AppState.is_report_calculated & (AppState.calculation_details.length() > 0),
+                rx.vstack(
+                    rx.heading("📋 상세 계산 내역", size="5", margin_bottom="10px"),
+                    rx.foreach(
+                        AppState.calculation_details,
+                        lambda detail: rx.hstack(
+                            rx.hstack(
+                                rx.text(detail["category"], font_weight="bold"),
+                                rx.text(" - ", font_weight="bold"),
+                                rx.text(detail["activity_type"], font_weight="bold"),
+                                rx.text(": ", font_weight="bold"),
+                                spacing="0",
+                                width="200px"
+                            ),
+                            rx.hstack(
+                                rx.text(detail["value"], color="gray.600"),
+                                rx.text(detail["unit"], color="gray.600"),
+                                rx.text(" = ", color="gray.600"),
+                                spacing="0"
+                            ),
+                            rx.hstack(
+                                rx.text(detail["emission"], color="blue.700", font_weight="bold"),
+                                rx.text("kgCO2e", color="blue.700", font_weight="bold"),
+                                spacing="0"
+                            ),
+                            rx.hstack(
+                                rx.text("(", color="green.600", size="2"),
+                                rx.text(detail["method"], color="green.600", size="2"),
+                                rx.text(")", color="green.600", size="2"),
+                                spacing="0"
+                            ),
+                            spacing="2",
+                            margin_bottom="5px"
+                        )
+                    ),
+                    spacing="2",
+                    padding="20px",
+                    border="1px solid",
+                    border_color="gray.300",
+                    border_radius="8px",
+                    margin_bottom="20px"
+                ),
             ),
             
             rx.divider(margin_y="20px"),

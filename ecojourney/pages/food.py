@@ -7,7 +7,8 @@ FOOD_SUBCATEGORIES = {
     "고기류": ["소고기", "돼지고기", "닭고기"],
     "채소류": ["양파", "파", "마늘"],
     "유제품류": ["우유", "치즈"],
-    "기타": ["가공식품", "과자", "빵류", "음료", "기타"]
+    "쌀밥": [],  # 쌀밥은 하위 카테고리 없음
+    "커피": ["아메리카노", "카페라떼"],  # 커피 하위 카테고리
 }
 UNITS = ["g", "ml", "회"]
 
@@ -108,7 +109,8 @@ def food_button(label: str, is_selected, on_click):
 # =======================================================
 
 def food_input_field(label: str, value_name: str, unit_name: str, sub_name: str):
-    sub_items = FOOD_SUBCATEGORIES.get(label, ["기타"])
+    sub_items = FOOD_SUBCATEGORIES.get(label, [])
+    has_subcategories = len(sub_items) > 0
 
     return rx.box(
         rx.hstack(
@@ -118,14 +120,18 @@ def food_input_field(label: str, value_name: str, unit_name: str, sub_name: str)
                 min_width="80px",
                 color="black",       # ← 여기만 바꾸면 바로 해결됨
             ),
-            rx.select(
-                items=sub_items,
-                placeholder=f"세부 카테고리 선택",
-                name=sub_name,
-                width="140px",
-                background_color="rgba(255, 255, 255, 0.9)",
-                color="black",
-                border_radius="8px",
+            rx.cond(
+                has_subcategories,
+                rx.select(
+                    items=sub_items,
+                    placeholder=f"세부 카테고리 선택",
+                    name=sub_name,
+                    width="140px",
+                    background_color="rgba(255, 255, 255, 0.9)",
+                    color="black",
+                    border_radius="8px",
+                ),
+                rx.box(width="140px"),  # 하위 카테고리가 없으면 빈 공간
             ),
             rx.select(
                 UNITS,
@@ -186,7 +192,8 @@ def food_page():
                         food_button("고기류", AppState.selected_meat, AppState.toggle_meat),
                         food_button("채소류", AppState.selected_veg, AppState.toggle_veg),
                         food_button("유제품류", AppState.selected_dairy, AppState.toggle_dairy),
-                        food_button("기타", AppState.selected_other, AppState.toggle_other),
+                        food_button("쌀밥", AppState.selected_rice, AppState.toggle_rice),
+                        food_button("커피", AppState.selected_coffee, AppState.toggle_coffee),
                         wrap="nowrap",
                         justify="center",
                         spacing="3",
@@ -239,8 +246,10 @@ def food_page():
                                 food_input_field("채소류", "veg_value", "veg_unit", "veg_sub")),
                             rx.cond(AppState.show_dairy,
                                 food_input_field("유제품류", "dairy_value", "dairy_unit", "dairy_sub")),
-                            rx.cond(AppState.show_other,
-                                food_input_field("기타", "other_value", "other_unit", "other_sub")),
+                            rx.cond(AppState.show_rice,
+                                food_input_field("쌀밥", "rice_value", "rice_unit", "rice_sub")),
+                            rx.cond(AppState.show_coffee,
+                                food_input_field("커피", "coffee_value", "coffee_unit", "coffee_sub")),
 
                             rx.box(height="20px"),
 

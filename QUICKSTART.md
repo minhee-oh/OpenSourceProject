@@ -32,6 +32,11 @@ npm install
 
 ```
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# 탄소 배출량 계산 API (선택사항)
+# API 키가 없어도 로컬 배출 계수로 계산됩니다
+CLIMATIQ_API_KEY=your_climatiq_api_key_here
+CARBONCLOUD_API_KEY=your_carboncloud_api_key_here
 ```
 
 ### Gemini API 키 무료 발급 방법
@@ -63,7 +68,29 @@ GEMINI_API_KEY=your_gemini_api_key_here
 > - API 키는 환경 변수로 관리되며, 절대 Git에 커밋하지 마세요 (`.gitignore`에 포함되어 있습니다).
 > - 무료 티어는 개발 및 테스트 목적으로 충분합니다.
 
-## 3. 서버 실행
+## 3. 데이터베이스 초기화
+
+모델을 정의했으므로 데이터베이스를 초기화하고 마이그레이션을 적용해야 합니다:
+
+```bash
+cd ecojourney
+
+# 1. DB 초기화 (아직 안 했다면)
+reflex db init
+
+# 2. 변경 사항(작성한 모델) 감지 및 스크립트 생성
+reflex db makemigrations --message "init models"
+
+# 3. 실제 DB에 테이블 생성
+reflex db migrate
+```
+
+> **참고**: 
+> - 첫 실행 시에만 `reflex db init`을 실행하면 됩니다.
+> - 모델을 수정한 후에는 `makemigrations`와 `migrate`만 실행하면 됩니다.
+> - 데이터베이스 파일은 프로젝트 루트에 생성됩니다.
+
+## 4. 서버 실행
 
 ### Reflex 앱 실행 (프론트엔드 + 백엔드 통합)
 
@@ -79,10 +106,12 @@ reflex run
 - Reflex 앱: http://localhost:3000
 - API 문서: http://localhost:3000/api/docs (FastAPI 라우터가 통합됨)
 
-> **참고**: Reflex는 자체 백엔드를 포트 3000에서 실행하며, WebSocket도 같은 포트를 사용합니다.
-> 모든 API는 `/api` 경로로 접근 가능합니다.
+> **참고**: 
+> - 데이터베이스를 초기화하지 않았다면 먼저 [데이터베이스 초기화](#3-데이터베이스-초기화) 단계를 완료하세요.
+> - Reflex는 자체 백엔드를 포트 3000에서 실행하며, WebSocket도 같은 포트를 사용합니다.
+> - 모든 API는 `/api` 경로로 접근 가능합니다.
 
-## 4. 사용 방법
+## 5. 사용 방법
 
 1. **홈 화면**: 앱 시작 시 홈 화면이 표시됩니다
    - "탄소 발자국 측정 시작하기" 버튼을 클릭하여 인트로 페이지로 이동
@@ -102,7 +131,7 @@ reflex run
    - 카테고리별 배출량
    - AI 기반 맞춤형 코칭 제안
 
-## 5. 문제 해결
+## 6. 문제 해결
 
 ### 페이지 이동이 안 될 때
 

@@ -1,9 +1,16 @@
 """
 탄소 배출량 계산 모듈
 사용자 친화적 입력을 국제 표준 단위로 변환하여 탄소 배출량을 계산합니다.
+
+API 우선 사용, 실패 시 로컬 배출 계수 사용 (Fallback)
 """
 
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
+import logging
+from .carbon_api import calculate_carbon_with_api
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # 로그 레벨 설정
 
 # 카테고리별 탄소 배출 계수 (kgCO₂e per unit)
 EMISSION_FACTORS = {
@@ -81,8 +88,12 @@ WASTE_WEIGHT = {
 
 # 식품: 1회 식사 기준량 (g)
 FOOD_SERVING = {
-    "소고기": 200.0,  # g
+    "소고기": 200.0,   # g
     "돼지고기": 150.0, # g
+    "쌀밥": 200.0,     # 1공기 200g 기준
+    "커피": 15.0,      # 1잔 원두 15g 기준
+    "아메리카노": 15.0,  # 1잔 원두 15g 기준
+    "카페라떼": 15.0,   # 1잔 원두 15g 기준
 }
 
 
@@ -127,12 +138,7 @@ def convert_to_standard_unit(
             return value / 1000.0, "kg"
         elif unit == "1회 식사":
             # 1회 식사 기준량 적용
-            if activity_type == "소고기":
-                serving_g = FOOD_SERVING.get("소고기", 200.0)
-            elif activity_type == "돼지고기":
-                serving_g = FOOD_SERVING.get("돼지고기", 150.0)
-            else:
-                serving_g = 200.0  # 기본값
+            serving_g = FOOD_SERVING.get(activity_type, 200.0)
             return (serving_g * value) / 1000.0, "kg"
         elif unit == "kg":
             return value, "kg"
@@ -189,10 +195,12 @@ def calculate_carbon_emission(
     activity_type: str, 
     value: float, 
     unit: str,
-    sub_category: str = None
+    sub_category: str = None,
+    use_api: bool = True  # API 사용 여부 (기본값: True)
 ) -> dict:
     """
     탄소 배출량 계산
+    API를 우선 사용하고, 실패 시 로컬 배출 계수 사용 (Fallback)
     
     Args:
         category: 카테고리
@@ -200,45 +208,88 @@ def calculate_carbon_emission(
         value: 사용자 입력 값
         unit: 사용자 입력 단위
         sub_category: 하위 카테고리 (의류: 새제품/빈티지, 식품: 육류/채소)
+        use_api: API 사용 여부 (기본값: True)
     
     Returns:
         계산 결과 딕셔너리
     """
+    logger.info(f"[탄소 계산] 시작 - 카테고리: {category}, 활동: {activity_type}, 값: {value}{unit}")
+    
     # 표준 단위로 변환
     converted_value, standard_unit = convert_to_standard_unit(
         category, activity_type, value, unit, sub_category
     )
+    logger.info(f"[탄소 계산] 단위 변환 완료: {value}{unit} → {converted_value}{standard_unit}")
     
-    # 배출 계수 가져오기
-    emission_factor = 0.0
+    carbon_emission = None
+    calculation_method = "local"  # "api" 또는 "local"
     
-    if category == "의류":
-        # 의류는 새제품/빈티지에 따라 다른 계수
-        if sub_category:
-            key = f"{activity_type}_{sub_category}"
-            emission_factor = EMISSION_FACTORS["의류"].get(key, 0.0)
-        else:
-            # 기본값: 새제품
-            key = f"{activity_type}_새제품"
-            emission_factor = EMISSION_FACTORS["의류"].get(key, 0.0)
-        # 의류는 개당 배출량이므로 개수 그대로 사용
-        carbon_emission = value * emission_factor
+    # API 사용 시도 (모든 카테고리 대상, 실패 시 로컬 Fallback)
+    if use_api:
+        logger.info(f"[탄소 계산] API 사용 시도 중... (카테고리: {category})")
+        try:
+            carbon_emission = calculate_carbon_with_api(
+                category=category,
+                activity_type=activity_type,
+                value=value,
+                unit=unit,
+                converted_value=converted_value,
+                standard_unit=standard_unit
+            )
+            if carbon_emission is not None:
+                calculation_method = "api"
+                logger.info(f"[탄소 계산] ✅ API로 계산 완료: {category}/{activity_type} = {carbon_emission}kgCO2e")
+            else:
+                logger.warning(f"[탄소 계산] API가 None 반환, 로컬 계산으로 전환")
+        except Exception as e:
+            logger.warning(f"[탄소 계산] API 계산 실패, 로컬 계산으로 전환: {e}", exc_info=True)
     else:
-        # 나머지는 변환된 값 × 배출 계수
-        if category in EMISSION_FACTORS and activity_type in EMISSION_FACTORS[category]:
-            emission_factor = EMISSION_FACTORS[category][activity_type]
-        else:
-            emission_factor = EMISSION_FACTORS.get(category, {}).get("기본", 0.0)
-        
-        carbon_emission = converted_value * emission_factor
+        if not use_api:
+            logger.info(f"[탄소 계산] API 사용 비활성화, 로컬 계산 사용")
     
-    return {
+    # API 실패 또는 API 비활성화인 경우 로컬 배출 계수 사용
+    if carbon_emission is None:
+        logger.info(f"[탄소 계산] 로컬 배출 계수로 계산 시작...")
+        emission_factor = 0.0
+        
+        if category == "의류":
+            # 의류는 새제품/빈티지에 따라 다른 계수
+            if sub_category:
+                key = f"{activity_type}_{sub_category}"
+                emission_factor = EMISSION_FACTORS["의류"].get(key, 0.0)
+                logger.info(f"[탄소 계산] 의류 배출 계수: {key} = {emission_factor}kgCO2e/개")
+            else:
+                # 기본값: 새제품
+                key = f"{activity_type}_새제품"
+                emission_factor = EMISSION_FACTORS["의류"].get(key, 0.0)
+                logger.info(f"[탄소 계산] 의류 배출 계수 (기본값): {key} = {emission_factor}kgCO2e/개")
+            # 의류는 개당 배출량이므로 개수 그대로 사용
+            carbon_emission = value * emission_factor
+            logger.info(f"[탄소 계산] 의류 계산: {value}개 × {emission_factor} = {carbon_emission}kgCO2e")
+        else:
+            # 나머지는 변환된 값 × 배출 계수
+            if category in EMISSION_FACTORS and activity_type in EMISSION_FACTORS[category]:
+                emission_factor = EMISSION_FACTORS[category][activity_type]
+            else:
+                emission_factor = EMISSION_FACTORS.get(category, {}).get("기본", 0.0)
+            
+            logger.info(f"[탄소 계산] 배출 계수: {category}/{activity_type} = {emission_factor}")
+            carbon_emission = converted_value * emission_factor
+            logger.info(f"[탄소 계산] 로컬 계산: {converted_value}{standard_unit} × {emission_factor} = {carbon_emission}kgCO2e")
+        
+        calculation_method = "local"
+    
+    result = {
         "carbon_emission_kg": round(carbon_emission, 3),
         "converted_value": round(converted_value, 2),
         "converted_unit": standard_unit,
         "original_value": value,
-        "original_unit": unit
+        "original_unit": unit,
+        "calculation_method": calculation_method  # API 사용 여부 표시
     }
+    
+    logger.info(f"[탄소 계산] ✅ 최종 결과: {result['carbon_emission_kg']}kgCO2e (방법: {calculation_method})")
+    return result
 
 
 def get_category_activities(category: str) -> List[str]:
@@ -246,9 +297,11 @@ def get_category_activities(category: str) -> List[str]:
     if category == "교통":
         return ["자동차", "버스", "지하철", "걷기", "자전거"]
     elif category == "의류":
-        return ["티셔츠", "청바지", "신발"]
+        # UI 라벨 기준: 상의/하의/신발/가방/잡화
+        return ["상의", "하의", "신발", "가방/잡화"]
     elif category == "식품":
-        return ["소고기", "돼지고기", "양파", "파", "마늘"]
+        # API 매핑에 맞춘 주요 식품 하위 카테고리
+        return ["소고기", "돼지고기", "닭고기", "우유", "치즈", "쌀밥", "커피"]
     elif category == "쓰레기":
         return ["일반", "플라스틱", "종이", "유리", "캔"]
     elif category == "전기":
