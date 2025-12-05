@@ -37,7 +37,11 @@ class MileageState(BattleState):
             converted_mileage = self.mileage_request_points
             
             # 포인트 차감
-            user = await User.find_by_id(self.current_user_id)
+            users = await User.find(User.student_id == self.current_user_id)
+            if not users:
+                self.mileage_error_message = "사용자를 찾을 수 없습니다."
+                return
+            user = users[0]
             user.current_points -= self.mileage_request_points
             self.current_user_points = user.current_points
             await user.save()
@@ -58,5 +62,6 @@ class MileageState(BattleState):
         except Exception as e:
             self.mileage_error_message = f"마일리지 환산 실패: {str(e)}"
             logger.error(f"마일리지 환산 오류: {e}")
+
 
 

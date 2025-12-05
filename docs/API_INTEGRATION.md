@@ -12,11 +12,6 @@ EcoJourney는 탄소 배출량 계산을 위해 외부 API를 사용할 수 있�
 - **API 문서**: https://docs.climatiq.io/
 - **무료 티어**: 제공 (제한 있음)
 
-### 2. CarbonCloud API
-- **용도**: 식품 및 식재료 탄소 배출량
-- **웹사이트**: https://www.carboncloud.com/
-- **API 문서**: CarbonCloud 공식 문서 참조
-- **무료 티어**: 확인 필요
 
 ## API 키 발급 방법
 
@@ -128,5 +123,6 @@ print(result["carbon_emission_kg"])  # 탄소 배출량 (kgCO2e)
 4. 로그에서 오류 메시지 확인
 
 API가 실패해도 자동으로 로컬 배출 계수를 사용하므로 앱은 정상 작동합니다.
+
 
 

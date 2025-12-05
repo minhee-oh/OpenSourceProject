@@ -3,7 +3,7 @@
 """
 
 import reflex as rx
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import date
 import logging
 from .base import BaseState
@@ -17,6 +17,12 @@ class CarbonState(AuthState):
     """
     탄소 배출량 입력 및 저장 관련 상태 및 로직
     """
+    # 저장 관련 상태
+    save_message: str = ""
+    is_saving: bool = False
+    is_save_success: bool = False
+    saved_logs_history: List[Dict[str, Any]] = []
+    
     # ---------- 교통수단 선택 상태 ----------
     selected_car: bool = False
     selected_bus: bool = False
@@ -531,14 +537,39 @@ class CarbonState(AuthState):
     async def save_carbon_log_to_db(self):
         """현재 입력된 탄소 배출량을 데이터베이스에 저장"""
         if not self.is_logged_in or not self.current_user_id:
-            logger.warning("로그인하지 않은 사용자가 탄소 로그 저장 시도")
+            self.save_message = "로그인이 필요합니다."
             return
         
+        self.is_saving = True
+        self.save_message = ""
+        
         try:
+            import json
             from ..service.carbon_calculator import calculate_carbon_emission
             
-            # 전체 탄소 배출량 계산
-            total_emission = 0.0
+            # 전체 탄소 배출량 계산 (이미 계산된 값이 있으면 사용)
+            if not self.is_report_calculated or self.total_carbon_emission == 0.0:
+                total_emission = 0.0
+                for activity in self.all_activities:
+                    category = activity.get("category")
+                    activity_type = activity.get("activity_type")
+                    value = activity.get("value", 0)
+                    unit = activity.get("unit", "")
+                    sub_category = activity.get("subcategory") or activity.get("is_vintage")
+                    
+                    result = calculate_carbon_emission(
+                        category=category,
+                        activity_type=activity_type,
+                        value=value,
+                        unit=unit,
+                        sub_category=sub_category
+                    )
+                    emission = result.get("carbon_emission_kg", 0.0)
+                    total_emission += emission
+            else:
+                total_emission = self.total_carbon_emission
+            
+            # 간단한 통계 수집 (기존 호환성 유지)
             transport_km = 0.0
             ac_hours = 0.0
             cup_count = 0
@@ -549,17 +580,6 @@ class CarbonState(AuthState):
                 value = activity.get("value", 0)
                 unit = activity.get("unit", "")
                 
-                # 탄소 배출량 계산
-                result = calculate_carbon_emission(
-                    category=category,
-                    activity_type=activity_type,
-                    value=value,
-                    unit=unit
-                )
-                emission = result.get("carbon_emission_kg", 0.0)
-                total_emission += emission
-                
-                # 간단한 통계 수집
                 if category == "교통":
                     if unit == "km":
                         transport_km += value
@@ -577,45 +597,221 @@ class CarbonState(AuthState):
                     if activity_type == "일회용컵":
                         cup_count += int(value)
             
-            # 오늘 날짜의 기존 로그 확인
+            # all_activities를 JSON으로 변환
+            activities_json = json.dumps(self.all_activities, ensure_ascii=False, default=str)
+            
+            # 오늘 날짜의 기존 로그 확인 (SQLModel Session 사용)
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
             today = date.today()
-            existing_logs = await CarbonLog.find(
-                CarbonLog.student_id == self.current_user_id,
-                CarbonLog.log_date == today
-            )
-            
-            if existing_logs:
-                log = existing_logs[0]
-                log.transport_km = transport_km
-                log.ac_hours = ac_hours
-                log.cup_count = cup_count
-                log.total_emission = total_emission
-                await log.save()
-            else:
-                new_log = CarbonLog(
-                    student_id=self.current_user_id,
-                    log_date=today,
-                    transport_km=transport_km,
-                    ac_hours=ac_hours,
-                    cup_count=cup_count,
-                    total_emission=total_emission
+            existing_log = None
+            with Session(engine) as session:
+                stmt = select(CarbonLog).where(
+                    CarbonLog.student_id == self.current_user_id,
+                    CarbonLog.log_date == today
                 )
-                await new_log.save()
+                existing_log = session.exec(stmt).first()
+                
+                if existing_log:
+                    log = existing_log
+                    log.transport_km = transport_km
+                    log.ac_hours = ac_hours
+                    log.cup_count = cup_count
+                    log.total_emission = total_emission
+                    log.activities_json = activities_json
+                    session.add(log)
+                else:
+                    log = CarbonLog(
+                        student_id=self.current_user_id,
+                        log_date=today,
+                        transport_km=transport_km,
+                        ac_hours=ac_hours,
+                        cup_count=cup_count,
+                        total_emission=total_emission,
+                        activities_json=activities_json
+                    )
+                    session.add(log)
+                
+                session.commit()
             
-            # 사용자 아바타 상태 업데이트
-            user = await User.find_by_id(self.current_user_id)
-            if user:
-                user.avatar_status = self._update_avatar_status(total_emission)
-                await user.save()
+            # 사용자 아바타 상태 업데이트 및 포인트 지급
+            points_earned = 0
+            with Session(engine) as session:
+                user_stmt = select(User).where(User.student_id == self.current_user_id)
+                user = session.exec(user_stmt).first()
+                
+                if user:
+                    user.avatar_status = self._update_avatar_status(total_emission)
+                    if not existing_log:
+                        points_earned = int(total_emission * 10)
+                        user.current_points += points_earned
+                        self.current_user_points = user.current_points
+                        self.save_message = f"✅ 저장 완료! 포인트 {points_earned}점을 획득했습니다."
+                    else:
+                        self.save_message = "✅ 데이터가 업데이트되었습니다."
+                    
+                    self.is_save_success = True
+                    session.add(user)
+                    session.commit()
+                    logger.info(f"탄소 로그 저장/업데이트 완료: {self.current_user_id}, 배출량: {total_emission}kg, 포인트: {user.current_points}")
+                else:
+                    self.save_message = "❌ 사용자 정보를 찾을 수 없습니다."
+                    self.is_save_success = False
+                    logger.error(f"탄소 로그 저장 오류: 사용자 {self.current_user_id}를 찾을 수 없음")
             
-            # 포인트 지급
-            points_earned = int(total_emission * 10)
-            user.current_points += points_earned
-            self.current_user_points = user.current_points
-            await user.save()
-            
-            logger.info(f"탄소 로그 저장 완료: {self.current_user_id}, 배출량: {total_emission}kg, 포인트: {points_earned}")
+            self.is_saving = False
             
         except Exception as e:
-            logger.error(f"탄소 로그 저장 오류: {e}")
+            self.save_message = f"❌ 저장 중 오류가 발생했습니다: {str(e)}"
+            self.is_save_success = False
+            self.is_saving = False
+            logger.error(f"탄소 로그 저장 오류: {e}", exc_info=True)
+    
+    async def load_saved_logs_history(self):
+        """저장된 로그 이력을 불러옵니다."""
+        self.saved_logs_history = await self.get_saved_logs_history(limit=10)
+    
+    async def load_saved_activities(self):
+        """저장된 입력 데이터를 불러옵니다. 오늘 날짜의 데이터를 불러옵니다."""
+        if not self.is_logged_in or not self.current_user_id:
+            return
+        
+        try:
+            target_date = date.today()
+            
+            logs = await CarbonLog.find(
+                CarbonLog.student_id == self.current_user_id,
+                CarbonLog.log_date == target_date
+            )
+            
+            if logs:
+                log = logs[0]
+                activities = log.get_activities()
+                if activities:
+                    self.all_activities = activities
+                    # 저장된 데이터가 있으면 자동으로 계산 수행
+                    await self.calculate_report()
+                    logger.info(f"저장된 데이터 불러오기 완료: {self.current_user_id}, 날짜: {target_date}, 활동 수: {len(activities)}")
+                else:
+                    logger.info(f"저장된 데이터가 없습니다: {self.current_user_id}, 날짜: {target_date}")
+            else:
+                logger.info(f"저장된 로그가 없습니다: {self.current_user_id}, 날짜: {target_date}")
+                
+        except Exception as e:
+            logger.error(f"저장된 데이터 불러오기 오류: {e}", exc_info=True)
+    
+    async def get_saved_logs_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """저장된 로그 이력을 반환합니다."""
+        if not self.is_logged_in or not self.current_user_id:
+            return []
+        
+        try:
+            logs = await CarbonLog.find(
+                CarbonLog.student_id == self.current_user_id
+            )
+            
+            # 날짜순으로 정렬 (최신순)
+            logs.sort(key=lambda x: x.log_date, reverse=True)
+            
+            result = []
+            for log in logs[:limit]:
+                result.append({
+                    "log_date": log.log_date,
+                    "total_emission": log.total_emission,
+                    "activities_count": len(log.get_activities()),
+                    "created_at": log.created_at
+                })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"로그 이력 조회 오류: {e}", exc_info=True)
+            return []
+    
+    async def get_carbon_statistics(self) -> Dict[str, Any]:
+        """탄소 배출량 통계 데이터 반환"""
+        if not self.is_logged_in or not self.current_user_id:
+            return {
+                "total_logs": 0,
+                "total_emission": 0.0,
+                "average_daily_emission": 0.0,
+                "total_activities": 0,
+                "category_breakdown": []
+            }
+        
+        try:
+            from ..models import CarbonLog
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            # SQLModel Session을 직접 사용하여 조회
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            logs = []
+            with Session(engine) as session:
+                statement = select(CarbonLog).where(CarbonLog.student_id == self.current_user_id)
+                logs = list(session.exec(statement).all())
+            
+            if not logs:
+                return {
+                    "total_logs": 0,
+                    "total_emission": 0.0,
+                    "average_daily_emission": 0.0,
+                    "total_activities": 0,
+                    "category_breakdown": []
+                }
+            
+            # 통계 계산
+            total_logs = len(logs)
+            total_emission = sum(log.total_emission for log in logs)
+            average_daily_emission = total_emission / total_logs if total_logs > 0 else 0.0
+            
+            # 카테고리별 통계
+            category_breakdown = {}
+            total_activities = 0
+            
+            for log in logs:
+                activities = log.get_activities()
+                total_activities += len(activities)
+                
+                for activity in activities:
+                    category = activity.get("category", "기타")
+                    if category not in category_breakdown:
+                        category_breakdown[category] = 0
+                    category_breakdown[category] += 1
+            
+            # Dict를 리스트로 변환하고 비율 계산 (Reflex foreach에서 사용하기 위해)
+            category_list = []
+            for k, v in category_breakdown.items():
+                percent = (v / total_activities * 100) if total_activities > 0 else 0
+                category_list.append({
+                    "name": k,
+                    "count": v,
+                    "percent": round(percent, 1)
+                })
+            
+            return {
+                "total_logs": total_logs,
+                "total_emission": round(total_emission, 2),
+                "average_daily_emission": round(average_daily_emission, 2),
+                "total_activities": total_activities,
+                "category_breakdown": category_list
+            }
+            
+        except Exception as e:
+            logger.error(f"탄소 통계 조회 오류: {e}", exc_info=True)
+            return {
+                "total_logs": 0,
+                "total_emission": 0.0,
+                "average_daily_emission": 0.0,
+                "total_activities": 0,
+                "category_breakdown": []
+            }
 

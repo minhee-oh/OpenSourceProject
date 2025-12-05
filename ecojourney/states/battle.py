@@ -82,7 +82,11 @@ class BattleState(CarbonState):
                 return
             
             # 포인트 차감
-            user = await User.find_by_id(self.current_user_id)
+            users = await User.find(User.student_id == self.current_user_id)
+            if not users:
+                self.battle_error_message = "사용자를 찾을 수 없습니다."
+                return
+            user = users[0]
             user.current_points -= self.battle_bet_amount
             self.current_user_points = user.current_points
             await user.save()
@@ -112,5 +116,6 @@ class BattleState(CarbonState):
         except Exception as e:
             self.battle_error_message = f"대항전 참가 실패: {str(e)}"
             logger.error(f"대항전 참가 오류: {e}")
+
 
 

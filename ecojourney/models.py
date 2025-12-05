@@ -1,6 +1,7 @@
 import reflex as rx
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, Dict, List, Any
+import json
 
 # -----------------------------------------------------------------------------
 # 1. 사용자 (User)
@@ -35,8 +36,9 @@ class CarbonLog(rx.Model, table=True):
     cup_count: int = 0
     ac_hours: float = 0.0
     
-    # 추가 카테고리 데이터 (JSON 형태로 저장하거나 별도 테이블로 분리 가능)
-    # 교통, 의류, 식품, 쓰레기, 전기, 물 등 상세 데이터는 JSON 필드로 저장 권장
+    # 상세 입력 데이터 (JSON 형태로 저장)
+    # 교통, 의류, 식품, 쓰레기, 전기, 물 등 모든 입력 데이터를 JSON으로 저장
+    activities_json: str = "[]"  # JSON 문자열로 저장 (all_activities 리스트)
     
     # 계산 결과
     total_emission: float = 0.0  # 단위: kgCO2eq
@@ -44,6 +46,17 @@ class CarbonLog(rx.Model, table=True):
     # AI 분석 결과 (Gemini)
     ai_feedback: Optional[str] = None
     created_at: datetime = datetime.now()
+    
+    def get_activities(self) -> List[Dict[str, Any]]:
+        """JSON 문자열을 파싱하여 활동 리스트 반환"""
+        try:
+            return json.loads(self.activities_json) if self.activities_json else []
+        except:
+            return []
+    
+    def set_activities(self, activities: List[Dict[str, Any]]):
+        """활동 리스트를 JSON 문자열로 저장"""
+        self.activities_json = json.dumps(activities, ensure_ascii=False, default=str)
 
 # -----------------------------------------------------------------------------
 # 3. 단과대 대항전 (Battle System)

@@ -19,10 +19,29 @@ class ChallengeState(MileageState):
     active_challenges: List[Dict[str, Any]] = []
     user_challenge_progress: List[Dict[str, Any]] = []
     
+    # 탄소 통계 개별 변수 (Reflex에서 Dict 접근 제한 때문에 분리)
+    carbon_total_logs: int = 0
+    carbon_total_emission: float = 0.0
+    carbon_average_daily_emission: float = 0.0
+    carbon_total_activities: int = 0
+    carbon_category_breakdown: List[Dict[str, Any]] = []
+    
     async def load_active_challenges(self):
         """활성화된 챌린지 목록 로드"""
         try:
-            challenges = await Challenge.find(Challenge.is_active == True)
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            # SQLModel Session을 직접 사용하여 조회
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            challenges = []
+            with Session(engine) as session:
+                statement = select(Challenge).where(Challenge.is_active == True)
+                challenges = list(session.exec(statement).all())
+            
             self.active_challenges = [
                 {
                     "id": ch.id,
@@ -34,7 +53,7 @@ class ChallengeState(MileageState):
                 for ch in challenges
             ]
         except Exception as e:
-            logger.error(f"챌린지 로드 오류: {e}")
+            logger.error(f"챌린지 로드 오류: {e}", exc_info=True)
             self.active_challenges = []
     
     async def update_challenge_progress(self, challenge_id: int, increment: int = 1):
@@ -74,8 +93,10 @@ class ChallengeState(MileageState):
                 progress.completed_at = datetime.now()
                 
                 # 보상 지급
-                user = await User.find_by_id(self.current_user_id)
-                user.current_points += challenge.reward_points
+                users = await User.find(User.student_id == self.current_user_id)
+                if users:
+                    user = users[0]
+                    user.current_points += challenge.reward_points
                 self.current_user_points = user.current_points
                 await user.save()
                 
@@ -85,5 +106,92 @@ class ChallengeState(MileageState):
             
         except Exception as e:
             logger.error(f"챌린지 진행도 업데이트 오류: {e}")
+    
+    async def load_user_challenge_progress(self):
+        """사용자의 챌린지 진행도 로드"""
+        if not self.is_logged_in or not self.current_user_id:
+            self.user_challenge_progress = []
+            return
+        
+        try:
+            # 활성화된 챌린지 로드
+            await self.load_active_challenges()
+            
+            # 사용자의 진행도 조회 (SQLModel Session 직접 사용)
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            all_progress = []
+            with Session(engine) as session:
+                statement = select(ChallengeProgress).where(
+                    ChallengeProgress.student_id == self.current_user_id
+                )
+                all_progress = list(session.exec(statement).all())
+            
+            # 챌린지 정보와 진행도 결합
+            progress_dict = {p.challenge_id: p for p in all_progress}
+            
+            result = []
+            for challenge in self.active_challenges:
+                challenge_id = challenge["id"]
+                progress = progress_dict.get(challenge_id)
+                
+                if progress:
+                    progress_percent = (progress.current_value / challenge["goal_value"]) * 100 if challenge["goal_value"] > 0 else 0
+                    result.append({
+                        "challenge_id": challenge_id,
+                        "title": challenge["title"],
+                        "type": challenge["type"],
+                        "goal_value": challenge["goal_value"],
+                        "current_value": progress.current_value,
+                        "progress_percent": min(progress_percent, 100),
+                        "is_completed": progress.is_completed,
+                        "reward_points": challenge["reward_points"]
+                    })
+                else:
+                    # 진행도가 없으면 0으로 시작
+                    result.append({
+                        "challenge_id": challenge_id,
+                        "title": challenge["title"],
+                        "type": challenge["type"],
+                        "goal_value": challenge["goal_value"],
+                        "current_value": 0,
+                        "progress_percent": 0,
+                        "is_completed": False,
+                        "reward_points": challenge["reward_points"]
+                    })
+            
+            self.user_challenge_progress = result
+            
+        except Exception as e:
+            logger.error(f"사용자 챌린지 진행도 로드 오류: {e}")
+            self.user_challenge_progress = []
+    
+    async def load_mypage_data(self):
+        """마이페이지 모든 데이터 로드"""
+        if not self.is_logged_in or not self.current_user_id:
+            return
+        
+        try:
+            # 챌린지 진행도 로드
+            await self.load_user_challenge_progress()
+            
+            # 탄소 통계 로드 및 개별 변수에 할당
+            stats = await self.get_carbon_statistics()
+            self.carbon_total_logs = stats.get("total_logs", 0)
+            self.carbon_total_emission = stats.get("total_emission", 0.0)
+            self.carbon_average_daily_emission = stats.get("average_daily_emission", 0.0)
+            self.carbon_total_activities = stats.get("total_activities", 0)
+            self.carbon_category_breakdown = stats.get("category_breakdown", [])
+            
+            logger.info(f"마이페이지 데이터 로드 완료: {self.current_user_id}")
+            
+        except Exception as e:
+            logger.error(f"마이페이지 데이터 로드 오류: {e}")
+
 
 
