@@ -22,6 +22,7 @@ class CarbonState(AuthState):
     is_saving: bool = False
     is_save_success: bool = False
     saved_logs_history: List[Dict[str, Any]] = []
+    has_today_log: bool = False  # 오늘 날짜에 저장된 로그가 있는지
     
     # ---------- 교통수단 선택 상태 ----------
     selected_car: bool = False
@@ -39,29 +40,28 @@ class CarbonState(AuthState):
     trans_input_mode: bool = False
 
     # ---------- 식품 선택 상태 ----------
-    selected_meat: bool = False
-    selected_veg: bool = False
     selected_dairy: bool = False
     selected_rice: bool = False
     selected_coffee: bool = False
+    selected_fastfood: bool = False
+    selected_noodles: bool = False  # 면류 (한국일보 기준만)
+    selected_cooked: bool = False  # 조리된 음식 (한국일보 기준만)
+    selected_side_dish: bool = False  # 반찬
+    selected_grilled_meat: bool = False  # 고기
+    selected_fruit: bool = False  # 과일
+    selected_pasta: bool = False  # 파스타 (Climatiq API)
 
-    show_meat: bool = False
-    show_veg: bool = False
     show_dairy: bool = False
     show_rice: bool = False
     show_coffee: bool = False
+    show_fastfood: bool = False
+    show_noodles: bool = False
+    show_cooked: bool = False
+    show_side_dish: bool = False
+    show_grilled_meat: bool = False
+    show_fruit: bool = False
+    show_pasta: bool = False
     food_input_mode: bool = False
-    
-    def _update_avatar_status(self, total_emission: float) -> str:
-        """탄소 배출량에 따라 아바타 상태를 업데이트합니다."""
-        if total_emission < 5.0:
-            return "GOOD"
-        elif total_emission < 10.0:
-            return "NORMAL"
-        elif total_emission < 15.0:
-            return "BAD"
-        else:
-            return "SICK"
     
     # ------------------------------ 교통 관련 메서드 ------------------------------
     
@@ -158,12 +158,6 @@ class CarbonState(AuthState):
     
     # ------------------------------ 식품 관련 메서드 ------------------------------
     
-    def toggle_meat(self):
-        self.selected_meat = not self.selected_meat
-
-    def toggle_veg(self):
-        self.selected_veg = not self.selected_veg
-
     def toggle_dairy(self):
         self.selected_dairy = not self.selected_dairy
 
@@ -173,13 +167,39 @@ class CarbonState(AuthState):
     def toggle_coffee(self):
         self.selected_coffee = not self.selected_coffee
 
+    def toggle_fastfood(self):
+        self.selected_fastfood = not self.selected_fastfood
+
+    def toggle_noodles(self):
+        self.selected_noodles = not self.selected_noodles
+
+    def toggle_cooked(self):
+        self.selected_cooked = not self.selected_cooked
+
+    def toggle_side_dish(self):
+        self.selected_side_dish = not self.selected_side_dish
+
+    def toggle_grilled_meat(self):
+        self.selected_grilled_meat = not self.selected_grilled_meat
+
+    def toggle_fruit(self):
+        self.selected_fruit = not self.selected_fruit
+
+    def toggle_pasta(self):
+        self.selected_pasta = not self.selected_pasta
+
     def show_food_input_fields(self):
         """선택된 음식 항목들의 입력 필드를 표시"""
-        self.show_meat = self.selected_meat
-        self.show_veg = self.selected_veg
         self.show_dairy = self.selected_dairy
         self.show_rice = self.selected_rice
         self.show_coffee = self.selected_coffee
+        self.show_fastfood = self.selected_fastfood
+        self.show_noodles = self.selected_noodles
+        self.show_cooked = self.selected_cooked
+        self.show_side_dish = self.selected_side_dish
+        self.show_grilled_meat = self.selected_grilled_meat
+        self.show_fruit = self.selected_fruit
+        self.show_pasta = self.selected_pasta
         self.food_input_mode = True
 
     def handle_food_submit(self, form_data: dict):
@@ -192,74 +212,140 @@ class CarbonState(AuthState):
 
         food_data = []
 
-        if self.show_meat and form_data.get("meat_value"):
-            # 고기류: 세부 선택(소고기/돼지고기/닭고기)을 activity_type으로 저장
-            meat_sub = form_data.get("meat_sub") or "소고기"
-            food_data.append({
-                "category": "식품",
-                "activity_type": meat_sub,
-                "subcategory": "고기류",
-                "value": float(form_data.get("meat_value", 0)),
-                "unit": form_data.get("meat_unit", "g"),
-            })
-
-        if self.show_veg and form_data.get("veg_value"):
-            # 채소류: 양파/파/마늘 등을 activity_type으로 저장
-            veg_sub = form_data.get("veg_sub") or "양파"
-            food_data.append({
-                "category": "식품",
-                "activity_type": veg_sub,
-                "subcategory": "채소류",
-                "value": float(form_data.get("veg_value", 0)),
-                "unit": form_data.get("veg_unit", "g"),
-            })
-
         if self.show_dairy and form_data.get("dairy_value"):
-            # 유제품류: 우유/치즈 등을 activity_type으로 저장
+            # 유제품류: 우유/치즈/두유를 activity_type으로 저장
             dairy_sub = form_data.get("dairy_sub") or "우유"
             food_data.append({
                 "category": "식품",
                 "activity_type": dairy_sub,
                 "subcategory": "유제품류",
                 "value": float(form_data.get("dairy_value", 0)),
-                "unit": form_data.get("dairy_unit", "g"),
+                "unit": "회",
             })
 
         if self.show_rice and form_data.get("rice_value"):
-            # 쌀밥: 하위 카테고리 없음
+            # 쌀밥: 세부 선택을 activity_type으로 저장
+            rice_sub = form_data.get("rice_sub") or "쌀밥"
             food_data.append({
                 "category": "식품",
-                "activity_type": "쌀밥",
+                "activity_type": rice_sub,
                 "subcategory": "쌀밥",
                 "value": float(form_data.get("rice_value", 0)),
-                "unit": form_data.get("rice_unit", "g"),
+                "unit": "회",
             })
 
         if self.show_coffee and form_data.get("coffee_value"):
-            # 커피: 아메리카노/카페라떼를 activity_type으로 저장
-            coffee_sub = form_data.get("coffee_sub") or "아메리카노"
+            # 커피: 한국일보 기준만 (에스프레소, 카페라떼한국)
+            coffee_sub = form_data.get("coffee_sub") or "에스프레소"
             food_data.append({
                 "category": "식품",
                 "activity_type": coffee_sub,
                 "subcategory": "커피",
                 "value": float(form_data.get("coffee_value", 0)),
-                "unit": form_data.get("coffee_unit", "g"),
+                "unit": "회",
+            })
+
+        if self.show_fastfood and form_data.get("fastfood_value"):
+            # 패스트푸드: 한국일보 기준만 (피자한국, 햄버거세트, 후라이드치킨)
+            fastfood_sub = form_data.get("fastfood_sub") or "피자한국"
+            food_data.append({
+                "category": "식품",
+                "activity_type": fastfood_sub,
+                "subcategory": "패스트푸드",
+                "value": float(form_data.get("fastfood_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_noodles and form_data.get("noodles_value"):
+            # 면류: 한국일보 기준만 (물냉면, 비빔냉면, 잔치국수, 비빔국수, 해물칼국수)
+            noodles_sub = form_data.get("noodles_sub") or "물냉면"
+            food_data.append({
+                "category": "식품",
+                "activity_type": noodles_sub,
+                "subcategory": "면류",
+                "value": float(form_data.get("noodles_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_cooked and form_data.get("cooked_value"):
+            # 조리된 음식: 한국일보 기준만 (된장국, 미역국, 콩나물국, 된장찌개, 김치찌개, 순두부찌개, 설렁탕, 갈비탕, 곰탕)
+            cooked_sub = form_data.get("cooked_sub") or "된장국"
+            food_data.append({
+                "category": "식품",
+                "activity_type": cooked_sub,
+                "subcategory": "국/찌개",
+                "value": float(form_data.get("cooked_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_side_dish and form_data.get("side_dish_value"):
+            # 반찬: 세부 선택을 activity_type으로 저장
+            side_dish_sub = form_data.get("side_dish_sub") or "배추김치"
+            food_data.append({
+                "category": "식품",
+                "activity_type": side_dish_sub,
+                "subcategory": "반찬",
+                "value": float(form_data.get("side_dish_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_grilled_meat and form_data.get("grilled_meat_value"):
+            # 고기: 세부 선택을 activity_type으로 저장
+            grilled_meat_sub = form_data.get("grilled_meat_sub") or "소고기구이"
+            food_data.append({
+                "category": "식품",
+                "activity_type": grilled_meat_sub,
+                "subcategory": "고기",
+                "value": float(form_data.get("grilled_meat_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_fruit and form_data.get("fruit_value"):
+            # 과일: 세부 선택을 activity_type으로 저장
+            fruit_sub = form_data.get("fruit_sub") or "딸기"
+            food_data.append({
+                "category": "식품",
+                "activity_type": fruit_sub,
+                "subcategory": "과일",
+                "value": float(form_data.get("fruit_value", 0)),
+                "unit": "회",
+            })
+
+        if self.show_pasta and form_data.get("pasta_value"):
+            # 파스타: 한끼 기준 로컬 계산
+            pasta_sub = form_data.get("pasta_sub") or "카르보나라"
+            food_data.append({
+                "category": "식품",
+                "activity_type": pasta_sub,
+                "subcategory": "파스타",
+                "value": float(form_data.get("pasta_value", 0)),
+                "unit": "회",
             })
 
         self.all_activities = self.all_activities + food_data
 
         # 입력모드 종료 + 선택 초기화
         self.food_input_mode = False
-        self.selected_meat = False
-        self.selected_veg = False
         self.selected_dairy = False
         self.selected_rice = False
         self.selected_coffee = False
-        self.show_meat = False
-        self.show_veg = False
+        self.selected_fastfood = False
+        self.selected_noodles = False
+        self.selected_cooked = False
+        self.selected_side_dish = False
+        self.selected_grilled_meat = False
+        self.selected_fruit = False
+        self.selected_pasta = False
         self.show_dairy = False
         self.show_rice = False
         self.show_coffee = False
+        self.show_fastfood = False
+        self.show_noodles = False
+        self.show_cooked = False
+        self.show_side_dish = False
+        self.show_grilled_meat = False
+        self.show_fruit = False
+        self.show_pasta = False
 
         return rx.redirect("/input/clothing")
     
@@ -282,26 +368,30 @@ class CarbonState(AuthState):
 
         # 여러 종류를 한 번에 입력할 수 있도록 처리
         mapping = [
-            ("상의", "top_count"),
-            ("하의", "bottom_count"),
-            ("신발", "shoes_count"),
-            ("가방/잡화", "bag_count"),
+            ("상의", "top_count", "top_vintage"),
+            ("하의", "bottom_count", "bottom_vintage"),
+            ("신발", "shoes_count", "shoes_vintage"),
+            ("가방/잡화", "bag_count", "bag_vintage"),
         ]
 
-        for label, field in mapping:
-            value_str = form_data.get(field)
+        for label, count_field, vintage_field in mapping:
+            value_str = form_data.get(count_field)
             if value_str:
                 try:
                     value = float(value_str)
                 except ValueError:
                     continue
                 if value > 0:
+                    # 새제품/빈티지 선택 (기본값: 새제품)
+                    vintage_selection = form_data.get(vintage_field, "새제품")
+                    sub_category = "빈티지" if vintage_selection == "빈티지" else "새제품"
+                    
                     clothing_items.append({
                         "category": "의류",
                         "activity_type": label,
                         "value": value,
                         "unit": "개",
-                        "is_vintage": False,
+                        "sub_category": sub_category,
                     })
 
         if clothing_items:
@@ -491,7 +581,7 @@ class CarbonState(AuthState):
                 activity_type = activity.get("activity_type", "")
                 value = activity.get("value", 0)
                 unit = activity.get("unit", "")
-                sub_category = activity.get("subcategory") or activity.get("is_vintage")
+                sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("is_vintage")
                 
                 logger.info(f"[리포트 계산] [{idx+1}/{len(self.all_activities)}] 처리 중 - 카테고리: {category}, 활동: {activity_type}, 값: {value}{unit}")
                 
@@ -508,14 +598,20 @@ class CarbonState(AuthState):
                 method = result.get("calculation_method", "local")
                 total_emission += emission
                 
-                calculation_details.append({
+                detail = {
                     "category": category,
                     "activity_type": activity_type,
                     "value": value,
                     "unit": unit,
                     "emission": emission,
                     "method": method
-                })
+                }
+                
+                # 의류의 경우 새제품/빈티지 정보 추가
+                if category == "의류" and sub_category:
+                    detail["sub_category"] = sub_category
+                
+                calculation_details.append(detail)
                 
                 logger.info(f"[리포트 계산] ✅ [{idx+1}/{len(self.all_activities)}] 계산 완료: {category}/{activity_type} = {emission}kgCO2e (방법: {method})")
             
@@ -527,6 +623,15 @@ class CarbonState(AuthState):
             logger.info(f"[리포트 계산] ✅ 전체 계산 완료! 총 배출량: {self.total_carbon_emission}kgCO2e")
             logger.info(f"[리포트 계산] 계산 상세 내역: {calculation_details}")
             
+            # 절약량 계산 (자전거/걷기 사용 시)
+            await self._calculate_savings()
+            
+            # 포인트 계산 (리포트 표시용)
+            await self._calculate_points_for_report()
+            
+            # 카테고리별 배출량 집계
+            await self._calculate_category_breakdown()
+            
         except Exception as e:
             logger.error(f"[리포트 계산] ❌ 계산 오류 발생: {e}", exc_info=True)
             self.total_carbon_emission = 0.0
@@ -536,14 +641,25 @@ class CarbonState(AuthState):
     
     async def save_carbon_log_to_db(self):
         """현재 입력된 탄소 배출량을 데이터베이스에 저장"""
+        # 가장 먼저 로그 출력 (메서드 호출 확인)
+        print(f"[저장] 메서드 호출됨! 사용자: {self.current_user_id}, 로그인: {self.is_logged_in}")
+        logger.info(f"[저장 시작] ========== 저장 프로세스 시작 ==========")
+        logger.info(f"[저장 시작] 사용자: {self.current_user_id}, 로그인 상태: {self.is_logged_in}")
+        
         if not self.is_logged_in or not self.current_user_id:
             self.save_message = "로그인이 필요합니다."
+            logger.error("[저장 실패] 로그인되지 않음")
+            print("[저장 실패] 로그인되지 않음")
             return
         
         self.is_saving = True
         self.save_message = ""
+        print(f"[저장] is_saving 설정 완료, all_activities 개수: {len(self.all_activities)}")
         
         try:
+            logger.info(f"[저장] all_activities 개수: {len(self.all_activities)}")
+            logger.info(f"[저장] all_activities 내용: {self.all_activities}")
+            print(f"[저장] all_activities: {self.all_activities}")
             import json
             from ..service.carbon_calculator import calculate_carbon_emission
             
@@ -555,7 +671,7 @@ class CarbonState(AuthState):
                     activity_type = activity.get("activity_type")
                     value = activity.get("value", 0)
                     unit = activity.get("unit", "")
-                    sub_category = activity.get("subcategory") or activity.get("is_vintage")
+                    sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("is_vintage")
                     
                     result = calculate_carbon_emission(
                         category=category,
@@ -609,22 +725,47 @@ class CarbonState(AuthState):
             engine = create_engine(db_url, echo=False)
             
             today = date.today()
+            
+            # 절약량이 계산되지 않았으면 계산
+            print(f"[저장] 절약량 계산 전: hasattr={hasattr(self, 'total_saved_emission')}, 값={getattr(self, 'total_saved_emission', 'N/A')}")
+            if not hasattr(self, 'total_saved_emission') or self.total_saved_emission == 0.0:
+                logger.info("[저장] 절약량 계산 시작...")
+                print("[저장] 절약량 계산 시작...")
+                await self._calculate_savings()
+                print(f"[저장] 절약량 계산 완료: {self.total_saved_emission}kg")
+            
+            # 리포트가 계산되지 않았으면 계산
+            print(f"[저장] 리포트 계산 전: is_report_calculated={self.is_report_calculated}")
+            if not self.is_report_calculated:
+                logger.info("[저장] 리포트 계산 시작...")
+                print("[저장] 리포트 계산 시작...")
+                await self.calculate_report()
+                print(f"[저장] 리포트 계산 완료: total_emission={self.total_carbon_emission}kg")
+            
+            logger.info(f"[저장] 절약량: {self.total_saved_emission}kg, 절약 금액: {self.saved_money}원")
+            print(f"[저장] 절약량: {self.total_saved_emission}kg, 절약 금액: {self.saved_money}원")
+            
             existing_log = None
+            is_new_log = True
             with Session(engine) as session:
                 stmt = select(CarbonLog).where(
                     CarbonLog.student_id == self.current_user_id,
                     CarbonLog.log_date == today
                 )
                 existing_log = session.exec(stmt).first()
-                
+            
+            is_new_log = existing_log is None
+            self.has_today_log = not is_new_log  # 오늘 날짜 로그 존재 여부 업데이트 (표시용)
+            logger.info(f"[저장] 기존 로그 존재 여부: {not is_new_log}")
+            print(f"[저장] 기존 로그 존재 여부: {not is_new_log}, is_new_log={is_new_log}")
+            
+            # 테스트용: 같은 날에 여러 번 저장 가능 (제한 제거)
+            
+            print(f"[저장] DB 저장 시작 - total_emission={total_emission}kg")
+            with Session(engine) as session:
                 if existing_log:
                     log = existing_log
-                    log.transport_km = transport_km
-                    log.ac_hours = ac_hours
-                    log.cup_count = cup_count
-                    log.total_emission = total_emission
-                    log.activities_json = activities_json
-                    session.add(log)
+                    logger.info(f"[저장] 기존 로그 업데이트 (기존 포인트: {log.points_earned})")
                 else:
                     log = CarbonLog(
                         student_id=self.current_user_id,
@@ -635,9 +776,29 @@ class CarbonState(AuthState):
                         total_emission=total_emission,
                         activities_json=activities_json
                     )
-                    session.add(log)
+                    logger.info("[저장] 새 로그 생성")
                 
+                log.transport_km = transport_km
+                log.ac_hours = ac_hours
+                log.cup_count = cup_count
+                log.total_emission = total_emission
+                log.activities_json = activities_json
+                
+                # 포인트 지급 내역 저장 (테스트용: 매번 계산하여 저장)
+                # 포인트 계산: 절약량 + 빈티지 제품 + 평균보다 낮은 배출량
+                points_to_save = await self._calculate_points(total_emission)
+                log.points_earned = points_to_save
+                logger.info(f"[저장] 포인트 저장: {points_to_save}점 (is_new_log={is_new_log})")
+                print(f"[저장] 포인트 저장: {points_to_save}점 (is_new_log={is_new_log})")
+                
+                print(f"[저장] session.add() 호출 전")
+                session.add(log)
+                print(f"[저장] session.commit() 호출 전")
                 session.commit()
+                print(f"[저장] session.commit() 완료")
+                session.refresh(log)  # DB에서 최신 데이터 가져오기
+                logger.info(f"[저장] CarbonLog 저장 완료 - ID: {log.id if hasattr(log, 'id') else 'N/A'}, 배출량: {log.total_emission}kg, 포인트: {log.points_earned}점")
+                print(f"[저장] CarbonLog 저장 완료 - 배출량: {log.total_emission}kg, 포인트: {log.points_earned}점")
             
             # 사용자 아바타 상태 업데이트 및 포인트 지급
             points_earned = 0
@@ -646,19 +807,50 @@ class CarbonState(AuthState):
                 user = session.exec(user_stmt).first()
                 
                 if user:
-                    user.avatar_status = self._update_avatar_status(total_emission)
-                    if not existing_log:
-                        points_earned = int(total_emission * 10)
+                    # 테스트용: 매번 포인트 계산 및 지급
+                    # 포인트 계산: 절약량 + 빈티지 제품 + 평균보다 낮은 배출량
+                    points_earned = await self._calculate_points(total_emission)
+                    
+                    if is_new_log:
+                        # 새로운 로그: 포인트 추가
                         user.current_points += points_earned
-                        self.current_user_points = user.current_points
-                        self.save_message = f"✅ 저장 완료! 포인트 {points_earned}점을 획득했습니다."
                     else:
-                        self.save_message = "✅ 데이터가 업데이트되었습니다."
+                        # 기존 로그 업데이트: 기존 포인트를 빼고 새 포인트 추가
+                        old_points = existing_log.points_earned if existing_log else 0
+                        user.current_points = user.current_points - old_points + points_earned
+                    
+                    self.current_user_points = user.current_points
+                    
+                    if points_earned > 0:
+                        # 포인트 획득 이유 메시지 생성
+                        reasons = []
+                        if self.total_saved_emission > 0:
+                            reasons.append(f"절약량 {self.total_saved_emission}kg")
+                        # 빈티지 제품 사용 확인
+                        vintage_count = sum(int(act.get("value", 0)) for act in self.all_activities 
+                                          if act.get("category") == "의류" 
+                                          and act.get("sub_category") == "빈티지")
+                        if vintage_count > 0:
+                            reasons.append(f"빈티지 제품 {vintage_count}개")
+                        # 평균보다 낮은 배출량 확인
+                        from ..service.average_data import get_total_average
+                        avg_emission = get_total_average()
+                        if total_emission < avg_emission:
+                            diff = avg_emission - total_emission
+                            reasons.append(f"평균보다 {diff:.1f}kg 낮음")
+                        
+                        reason_text = ", ".join(reasons) if reasons else "환경 친화적 활동"
+                        self.save_message = f"✅ 저장 완료! {reason_text}으로 {points_earned}점을 획득했습니다."
+                    else:
+                        self.save_message = "✅ 저장 완료!"
                     
                     self.is_save_success = True
+                    self.has_today_log = True  # 저장 완료 후 오늘 날짜 로그 존재 표시
                     session.add(user)
                     session.commit()
-                    logger.info(f"탄소 로그 저장/업데이트 완료: {self.current_user_id}, 배출량: {total_emission}kg, 포인트: {user.current_points}")
+                    session.refresh(user)  # DB에서 최신 데이터 가져오기
+                    logger.info(f"[저장 완료] 사용자: {self.current_user_id}, 배출량: {total_emission}kg, 절약량: {self.total_saved_emission}kg, 포인트: {points_earned}점 (총 포인트: {user.current_points})")
+                    logger.info(f"[저장 완료] DB 확인 - 사용자 포인트: {user.current_points}점, 로그 포인트: {log.points_earned}점")
                 else:
                     self.save_message = "❌ 사용자 정보를 찾을 수 없습니다."
                     self.is_save_success = False
@@ -666,11 +858,39 @@ class CarbonState(AuthState):
             
             self.is_saving = False
             
+            # 저장 성공 시 마이페이지 데이터 새로고침 (포인트 로그 업데이트)
+            if self.is_save_success:
+                try:
+                    # 사용자 포인트 정보 새로고침
+                    with Session(engine) as session:
+                        user_stmt = select(User).where(User.student_id == self.current_user_id)
+                        user = session.exec(user_stmt).first()
+                        if user:
+                            self.current_user_points = user.current_points
+                            logger.info(f"[저장] 사용자 포인트 새로고침: {self.current_user_points}점")
+                    
+                    # ChallengeState의 load_mypage_data 호출하여 포인트 로그 등 새로고침
+                    # AppState는 ChallengeState이므로 self를 통해 호출 가능
+                    if hasattr(self, 'load_mypage_data'):
+                        await self.load_mypage_data()
+                        logger.info("[저장] 마이페이지 데이터 새로고침 완료")
+                    else:
+                        # load_mypage_data가 없으면 포인트 로그만 직접 로드
+                        if hasattr(self, 'load_points_log'):
+                            await self.load_points_log()
+                            logger.info("[저장] 포인트 로그 새로고침 완료")
+                except Exception as refresh_error:
+                    logger.warning(f"[저장] 마이페이지 데이터 새로고침 실패 (무시): {refresh_error}")
+            
         except Exception as e:
             self.save_message = f"❌ 저장 중 오류가 발생했습니다: {str(e)}"
             self.is_save_success = False
             self.is_saving = False
-            logger.error(f"탄소 로그 저장 오류: {e}", exc_info=True)
+            logger.error(f"[저장 오류] 탄소 로그 저장 실패: {e}", exc_info=True)
+            logger.error(f"[저장 오류] 사용자: {self.current_user_id}, 활동 수: {len(self.all_activities)}")
+            print(f"[저장 오류] 예외 발생: {e}")
+            import traceback
+            print(f"[저장 오류] 스택 트레이스:\n{traceback.format_exc()}")
     
     async def load_saved_logs_history(self):
         """저장된 로그 이력을 불러옵니다."""
@@ -782,6 +1002,11 @@ class CarbonState(AuthState):
                 total_activities += len(activities)
                 
                 for activity in activities:
+                    # activity가 딕셔너리인지 확인
+                    if not isinstance(activity, dict):
+                        logger.warning(f"활동 데이터가 딕셔너리가 아닙니다: {type(activity)}, 값: {activity}")
+                        continue
+                    
                     category = activity.get("category", "기타")
                     if category not in category_breakdown:
                         category_breakdown[category] = 0
@@ -814,4 +1039,353 @@ class CarbonState(AuthState):
                 "total_activities": 0,
                 "category_breakdown": []
             }
+    
+    # 리포트용 카테고리별 배출량 및 AI 분석
+    category_emission_breakdown: Dict[str, float] = {}
+    average_comparison: Dict[str, Dict[str, float]] = {}
+    average_comparison_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태 (사용 안 함)
+    total_average_comparison: Dict[str, Any] = {}  # 총 평균 비교만 사용
+    category_emission_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태
+    donut_chart_svg: str = ""  # 도넛 차트 SVG 문자열
+    ai_analysis_result: str = ""
+    ai_suggestions: List[str] = []
+    ai_alternatives: List[Dict[str, Any]] = []
+    is_loading_ai: bool = False
+    
+    async def _calculate_savings(self):
+        """자전거/걷기 사용 시 절약한 탄소 배출량 계산"""
+        try:
+            from ..service.carbon_calculator import convert_to_standard_unit, EMISSION_FACTORS
+            
+            total_saved = 0.0
+            savings_list = []
+            
+            # 버스 배출 계수 (kgCO2/km)
+            BUS_EMISSION_FACTOR = EMISSION_FACTORS.get("교통", {}).get("버스", 0.089)
+            # 탄소 가격 (원/kgCO2)
+            CARBON_PRICE_PER_KG = 100.0  # 1kg CO2 = 100원
+            
+            logger.info(f"[절약량 계산] 시작 - 활동 수: {len(self.all_activities)}")
+            
+            # 교통 활동 중 자전거/걷기 사용한 경우 찾기
+            for activity in self.all_activities:
+                if not isinstance(activity, dict):
+                    continue
+                    
+                if activity.get("category") != "교통":
+                    continue
+                
+                activity_type = activity.get("activity_type", "")
+                if activity_type not in ["자전거", "걷기"]:
+                    continue
+                
+                value = activity.get("value", 0)
+                unit = activity.get("unit", "km")
+                
+                logger.info(f"[절약량 계산] {activity_type} 발견 - 값: {value}{unit}")
+                
+                # 거리로 변환
+                distance_km, _ = convert_to_standard_unit(
+                    category="교통",
+                    activity_type=activity_type,
+                    value=value,
+                    unit=unit,
+                    sub_category=None
+                )
+                
+                if distance_km <= 0:
+                    logger.warning(f"[절약량 계산] {activity_type} 거리가 0 이하: {distance_km}km")
+                    continue
+                
+                # 같은 거리를 버스로 갔을 때의 배출량 계산
+                bus_emission = distance_km * BUS_EMISSION_FACTOR
+                # 실제 배출량은 0 (자전거/걷기는 배출 없음)
+                saved_emission = bus_emission
+                saved_money = saved_emission * CARBON_PRICE_PER_KG
+                
+                total_saved += saved_emission
+                
+                savings_list.append({
+                    "activity_type": activity_type,
+                    "distance_km": round(distance_km, 2),
+                    "saved_emission": round(saved_emission, 3),
+                    "saved_money": round(saved_money, 2),
+                    "alternative": "버스"
+                })
+                
+                logger.info(f"[절약량 계산] {activity_type} {distance_km}km → 절약: {saved_emission}kgCO2e ({saved_money}원)")
+            
+            self.total_saved_emission = round(total_saved, 3)
+            self.saved_money = round(total_saved * CARBON_PRICE_PER_KG, 2)
+            self.savings_details = savings_list
+            
+            logger.info(f"[절약량 계산] ✅ 총 절약량: {self.total_saved_emission}kgCO2e, 절약 금액: {self.saved_money}원, 상세: {len(savings_list)}개")
+            
+        except Exception as e:
+            logger.error(f"[절약량 계산] 오류: {e}", exc_info=True)
+            self.total_saved_emission = 0.0
+            self.saved_money = 0.0
+            self.savings_details = []
+    
+    async def _calculate_points_for_report(self):
+        """리포트 표시용 포인트 계산 (상세 내역 포함)"""
+        try:
+            from ..service.average_data import get_total_average
+            
+            total_emission = self.total_carbon_emission
+            total_points = 0
+            points_breakdown = {
+                "절약량": 0,
+                "빈티지": 0,
+                "평균 대비": 0
+            }
+            
+            # 1. 절약량 기반 포인트 (자전거/걷기 사용 시)
+            savings_points = int(self.saved_money) if hasattr(self, 'saved_money') else 0
+            total_points += savings_points
+            points_breakdown["절약량"] = savings_points
+            
+            # 2. 빈티지 제품 사용 포인트
+            vintage_count = 0
+            for activity in self.all_activities:
+                category = activity.get("category")
+                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                if category == "의류" and sub_category == "빈티지":
+                    vintage_count += int(activity.get("value", 0))
+            
+            vintage_points = vintage_count * 10
+            total_points += vintage_points
+            points_breakdown["빈티지"] = vintage_points
+            
+            # 3. 평균보다 낮은 배출량 포인트
+            avg_emission = get_total_average()  # 14.5 kgCO₂e/일
+            if total_emission < avg_emission:
+                diff = avg_emission - total_emission
+                emission_points = min(int(diff * 20), 100)
+                total_points += emission_points
+                points_breakdown["평균 대비"] = emission_points
+            
+            self.points_breakdown = points_breakdown
+            self.total_points_earned = total_points
+            
+            logger.info(f"[리포트 포인트 계산] 총 포인트: {total_points}점 (절약량: {savings_points}점, 빈티지: {vintage_points}점, 평균 대비: {points_breakdown['평균 대비']}점)")
+            
+        except Exception as e:
+            logger.error(f"[리포트 포인트 계산] 오류: {e}", exc_info=True)
+            self.points_breakdown = {"절약량": 0, "빈티지": 0, "평균 대비": 0}
+            self.total_points_earned = 0
+    
+    async def _calculate_points(self, total_emission: float) -> int:
+        """
+        포인트 계산: 절약량 + 빈티지 제품 + 평균보다 낮은 배출량
+        
+        Args:
+            total_emission: 총 탄소 배출량 (kgCO₂e)
+        
+        Returns:
+            획득한 포인트 (점)
+        """
+        try:
+            from ..service.average_data import get_total_average
+            
+            total_points = 0
+            
+            # 1. 절약량 기반 포인트 (자전거/걷기 사용 시)
+            # 절약한 금액(원) = 포인트
+            savings_points = int(self.saved_money) if hasattr(self, 'saved_money') else 0
+            total_points += savings_points
+            logger.info(f"[포인트 계산] 절약량 포인트: {savings_points}점 (절약량: {self.total_saved_emission}kg)")
+            
+            # 2. 빈티지 제품 사용 포인트
+            vintage_count = 0
+            logger.info(f"[포인트 계산] all_activities 개수: {len(self.all_activities)}")
+            for activity in self.all_activities:
+                category = activity.get("category")
+                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                value = activity.get("value", 0)
+                logger.info(f"[포인트 계산] 활동 확인: category={category}, sub_category={sub_category}, value={value}")
+                if category == "의류" and sub_category == "빈티지":
+                    vintage_count += int(value)
+                    logger.info(f"[포인트 계산] 빈티지 제품 발견! {activity.get('activity_type')} {value}개")
+            
+            # 빈티지 제품 1개당 10점
+            vintage_points = vintage_count * 10
+            total_points += vintage_points
+            logger.info(f"[포인트 계산] 빈티지 제품 포인트: {vintage_points}점 (빈티지 제품: {vintage_count}개)")
+            
+            # 3. 평균보다 낮은 배출량 포인트
+            avg_emission = get_total_average()  # 14.5 kgCO₂e/일
+            if total_emission < avg_emission:
+                # 평균보다 낮은 배출량 1kg당 20점 (최대 100점)
+                diff = avg_emission - total_emission
+                emission_points = min(int(diff * 20), 100)
+                total_points += emission_points
+                logger.info(f"[포인트 계산] 평균 대비 낮은 배출량 포인트: {emission_points}점 (차이: {diff:.2f}kg)")
+            else:
+                logger.info(f"[포인트 계산] 평균보다 높은 배출량 (평균: {avg_emission}kg, 내 배출량: {total_emission}kg)")
+            
+            logger.info(f"[포인트 계산] 총 포인트: {total_points}점 (절약량: {savings_points}점, 빈티지: {vintage_points}점, 배출량: {total_points - savings_points - vintage_points}점)")
+            return total_points
+            
+        except Exception as e:
+            logger.error(f"[포인트 계산] 오류: {e}", exc_info=True)
+            # 오류 시 절약량 포인트만 지급
+            return int(self.saved_money) if hasattr(self, 'saved_money') else 0
+    
+    async def _calculate_category_breakdown(self):
+        """카테고리별 배출량 집계 (총 평균만 비교)"""
+        try:
+            from ..service.average_data import get_total_average
+            
+            # 카테고리별 배출량 집계
+            category_emission = {}
+            for detail in self.calculation_details:
+                category = detail.get("category", "기타")
+                emission = detail.get("emission", 0.0)
+                if category not in category_emission:
+                    category_emission[category] = 0.0
+                category_emission[category] += emission
+            
+            self.category_emission_breakdown = category_emission
+            
+            # 총 평균만 비교
+            total_average = get_total_average()
+            total_user_emission = self.total_carbon_emission
+            difference = total_user_emission - total_average
+            
+            self.total_average_comparison = {
+                "user": round(total_user_emission, 2),
+                "average": round(total_average, 2),
+                "difference": round(difference, 2),
+                "abs_difference": round(abs(difference), 2),  # 절댓값 미리 계산
+                "percentage": round((difference / total_average * 100), 1) if total_average > 0 else 0,
+                "is_better": difference < 0
+            }
+            
+            # 카테고리별 평균 비교는 제거
+            self.average_comparison = {}
+            self.average_comparison_list = []
+            
+            # 카테고리별 배출량도 리스트로 변환 (비율도 미리 계산, 도넛 차트용)
+            total = self.total_carbon_emission if self.total_carbon_emission > 0 else 1
+            category_list = []
+            cumulative_percentage = 0
+            
+            # 색상 매핑
+            color_map = {
+                "교통": "#3b82f6",
+                "식품": "#10b981",
+                "전기": "#f59e0b",
+                "물": "#06b6d4",
+                "의류": "#8b5cf6",
+                "쓰레기": "#ef4444"
+            }
+            
+            for category, emission in category_emission.items():
+                percentage = (emission / total) * 100 if total > 0 else 0
+                category_list.append({
+                    "category": category,
+                    "emission": round(emission, 2),
+                    "percentage": round(percentage, 1),
+                    "progress_value": percentage,
+                    "color": color_map.get(category, "#6b7280"),
+                    "cumulative_percentage": cumulative_percentage,
+                    "stroke_dasharray": f"{2 * 3.14159 * 80 * (percentage / 100)} {2 * 3.14159 * 80}",
+                    "stroke_dashoffset": cumulative_percentage * 2 * 3.14159 * 80 / 100,
+                    "rotation": -90 + cumulative_percentage * 360 / 100
+                })
+                cumulative_percentage += percentage
+            
+            self.category_emission_list = category_list
+            
+            # 도넛 차트 SVG 생성
+            self._generate_donut_chart_svg()
+            
+            logger.info(f"카테고리별 배출량 집계 완료: {category_emission}")
+            
+        except Exception as e:
+            logger.error(f"카테고리별 배출량 집계 오류: {e}", exc_info=True)
+            self.category_emission_breakdown = {}
+            self.average_comparison = {}
+            self.average_comparison_list = []
+            self.total_average_comparison = {}
+            self.category_emission_list = []
+            self.donut_chart_svg = ""
+    
+    def _generate_donut_chart_svg(self):
+        """도넛 차트 SVG 문자열 생성"""
+        try:
+            if not self.category_emission_list or self.total_carbon_emission <= 0:
+                self.donut_chart_svg = ""
+                return
+            
+            svg_parts = []
+            svg_parts.append('<svg width="200" height="200" viewBox="0 0 200 200">')
+            svg_parts.append('<circle cx="100" cy="100" r="80" fill="none" stroke="#e5e7eb" stroke-width="20"/>')
+            
+            cumulative_percentage = 0
+            for item in self.category_emission_list:
+                percentage = item["percentage"]
+                if percentage > 0:
+                    circumference = 2 * 3.14159 * 80
+                    dash_length = circumference * (percentage / 100)
+                    dash_offset = circumference * (cumulative_percentage / 100)
+                    rotation = -90 + (cumulative_percentage * 360 / 100)
+                    
+                    svg_parts.append(
+                        f'<circle cx="100" cy="100" r="80" fill="none" stroke="{item["color"]}" '
+                        f'stroke-width="20" stroke-dasharray="{dash_length} {circumference}" '
+                        f'stroke-dashoffset="{dash_offset}" transform="rotate({rotation} 100 100)"/>'
+                    )
+                    cumulative_percentage += percentage
+            
+            # 중앙 텍스트
+            svg_parts.append('<text x="100" y="95" text-anchor="middle" font-size="14" font-weight="bold" fill="#374151">총 배출량</text>')
+            svg_parts.append(f'<text x="100" y="115" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e40af">{self.total_carbon_emission:.2f}kg</text>')
+            svg_parts.append('</svg>')
+            
+            self.donut_chart_svg = ''.join(svg_parts)
+            logger.info("도넛 차트 SVG 생성 완료")
+            
+        except Exception as e:
+            logger.error(f"도넛 차트 SVG 생성 오류: {e}", exc_info=True)
+            self.donut_chart_svg = ""
+    
+    async def generate_ai_analysis(self):
+        """AI 분석 결과 생성"""
+        if not self.is_report_calculated:
+            return
+        
+        self.is_loading_ai = True
+        self.ai_analysis_result = ""
+        self.ai_suggestions = []
+        self.ai_alternatives = []
+        
+        try:
+            from ..service.ai_coach import generate_coaching_message
+            from ..service.models import AICoachRequest
+            
+            # AI 코칭 요청 생성
+            request = AICoachRequest(
+                total_carbon=self.total_carbon_emission,
+                category_breakdown=self.category_emission_breakdown,
+                activities=self.all_activities
+            )
+            
+            # AI 분석 결과 생성
+            response = generate_coaching_message(request)
+            
+            self.ai_analysis_result = response.analysis
+            self.ai_suggestions = response.suggestions
+            self.ai_alternatives = response.alternative_actions
+            
+            logger.info(f"AI 분석 결과 생성 완료")
+            
+        except Exception as e:
+            logger.error(f"AI 분석 결과 생성 오류: {e}", exc_info=True)
+            self.ai_analysis_result = "AI 분석을 불러오는 중 오류가 발생했습니다."
+            self.ai_suggestions = []
+            self.ai_alternatives = []
+        finally:
+            self.is_loading_ai = False
 

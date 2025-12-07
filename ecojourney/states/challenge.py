@@ -171,15 +171,84 @@ class ChallengeState(MileageState):
             logger.error(f"사용자 챌린지 진행도 로드 오류: {e}")
             self.user_challenge_progress = []
     
+    # 포인트 로그 관련 변수
+    points_log: List[Dict[str, Any]] = []
+    
+    async def load_points_log(self):
+        """포인트 획득 내역 로드 (날짜별)"""
+        if not self.is_logged_in or not self.current_user_id:
+            self.points_log = []
+            return
+        
+        try:
+            from ..models import CarbonLog
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            with Session(engine) as session:
+                # 포인트가 0보다 큰 로그만 조회 (포인트가 있는 기록만 표시)
+                stmt = select(CarbonLog).where(
+                    CarbonLog.student_id == self.current_user_id,
+                    CarbonLog.points_earned > 0
+                ).order_by(CarbonLog.log_date.desc())
+                
+                logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
+                print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
+                
+                logs = session.exec(stmt).all()
+                print(f"[포인트 로그] 조회 결과: {len(logs)}개")
+                
+                result = []
+                for log in logs:
+                    result.append({
+                        "date": log.log_date.strftime("%Y-%m-%d") if log.log_date else "",
+                        "points": log.points_earned
+                    })
+                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점")
+                
+                self.points_log = result
+                logger.info(f"포인트 로그 로드 완료: {len(result)}개")
+                print(f"[포인트 로그] 최종 결과: {len(result)}개")
+                
+        except Exception as e:
+            logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
+            self.points_log = []
+    
     async def load_mypage_data(self):
         """마이페이지 모든 데이터 로드"""
         if not self.is_logged_in or not self.current_user_id:
             return
         
         try:
+            # 사용자 포인트 정보 새로고침
+            from ..models import User
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            with Session(engine) as session:
+                user_stmt = select(User).where(User.student_id == self.current_user_id)
+                user = session.exec(user_stmt).first()
+                if user:
+                    self.current_user_points = user.current_points
+                    logger.info(f"[마이페이지] 사용자 포인트 새로고침: {self.current_user_points}점")
+        except Exception as e:
+            logger.error(f"사용자 포인트 새로고침 오류: {e}", exc_info=True)
+        
+        try:
             # 챌린지 진행도 로드
             await self.load_user_challenge_progress()
-            
+        except Exception as e:
+            logger.error(f"챌린지 진행도 로드 오류: {e}", exc_info=True)
+        
+        try:
             # 탄소 통계 로드 및 개별 변수에 할당
             stats = await self.get_carbon_statistics()
             self.carbon_total_logs = stats.get("total_logs", 0)
@@ -187,11 +256,23 @@ class ChallengeState(MileageState):
             self.carbon_average_daily_emission = stats.get("average_daily_emission", 0.0)
             self.carbon_total_activities = stats.get("total_activities", 0)
             self.carbon_category_breakdown = stats.get("category_breakdown", [])
-            
-            logger.info(f"마이페이지 데이터 로드 완료: {self.current_user_id}")
-            
         except Exception as e:
-            logger.error(f"마이페이지 데이터 로드 오류: {e}")
+            logger.error(f"탄소 통계 로드 오류: {e}", exc_info=True)
+            # 기본값 설정
+            self.carbon_total_logs = 0
+            self.carbon_total_emission = 0.0
+            self.carbon_average_daily_emission = 0.0
+            self.carbon_total_activities = 0
+            self.carbon_category_breakdown = []
+        
+        try:
+            # 포인트 로그 로드
+            await self.load_points_log()
+        except Exception as e:
+            logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
+            self.points_log = []
+        
+        logger.info(f"마이페이지 데이터 로드 완료: {self.current_user_id}, 포인트: {self.current_user_points}점")
 
 
 
