@@ -1,7 +1,7 @@
-# 파일 경로: backend/coaching_api.py
+# 파일 경로: ecojourney/coaching_api.py
 from fastapi import APIRouter, HTTPException
-from backend.models import UserActivityRawInput
-from backend.services.llm_service import get_coaching_feedback
+from ecojourney.ai.models import UserActivityRawInput
+from ecojourney.ai.llm_service import get_coaching_feedback
 
 router = APIRouter(
     prefix="/api/v1",

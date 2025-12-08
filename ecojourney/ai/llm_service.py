@@ -1,4 +1,4 @@
-# 파일 경로: backend/services/llm_service.py
+# 파일 경로: ecojourney/services/llm_service.py
 
 import json
 import logging
@@ -7,7 +7,7 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 # Gemini API 설정
-GEMINI_API_KEY = "AIzaSyDjTfBJCL7BzIsCtktumNXW_OzgwRQgI58"
+GEMINI_API_KEY = "AIzaSyALCN1ZF7PeU22sSGOAK9JPIvUztaymMSc"
 MODEL_NAME = "gemini-flash-latest"
 
 # Gemini SDK 로딩
@@ -195,7 +195,7 @@ def call_llm_api(prompt: str, user_data: Dict[str, Any]) -> str:
 # ======================================================================
 def get_coaching_feedback(user_data: Dict[str, Any]) -> str:
     """coaching_api에서 호출하는 LLM 피드백 생성 진입점"""
-    from backend.config.coaching_rules import COACHING_KNOWLEDGE_RULE
+    from ecojourney.config.coaching_rules import COACHING_KNOWLEDGE_RULE
 
     prompt = create_coaching_prompt(user_data, COACHING_KNOWLEDGE_RULE)
     return call_llm_api(prompt, user_data)
