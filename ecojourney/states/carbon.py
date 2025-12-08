@@ -1377,7 +1377,7 @@ class CarbonState(AuthState):
             
             self.ai_analysis_result = response.analysis
             self.ai_suggestions = response.suggestions
-            self.ai_alternatives = response.alternative_actions
+            self.ai_alternatives = response.alternative_actions 
             
             logger.info(f"AI 분석 결과 생성 완료")
             
@@ -1388,4 +1388,3 @@ class CarbonState(AuthState):
             self.ai_alternatives = []
         finally:
             self.is_loading_ai = False
-

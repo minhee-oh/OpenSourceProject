@@ -22,6 +22,30 @@ def header() -> rx.Component:
                 AppState.is_logged_in,
                 rx.hstack(
                     rx.button(
+                        "대결",
+                        on_click=rx.redirect("/battle"),
+                        background_color="rgba(255, 255, 255, 0.2)",
+                        color="white",
+                        border="1px solid rgba(255, 255, 255, 0.3)",
+                        border_radius="20px",
+                        padding="8px 20px",
+                        _hover={
+                            "background_color": "rgba(255, 255, 255, 0.3)",
+                        },
+                    ),
+                    rx.button(
+                        "랭킹",
+                        on_click=rx.redirect("/ranking"),
+                        background_color="rgba(255, 255, 255, 0.2)",
+                        color="white",
+                        border="1px solid rgba(255, 255, 255, 0.3)",
+                        border_radius="20px",
+                        padding="8px 20px",
+                        _hover={
+                            "background_color": "rgba(255, 255, 255, 0.3)",
+                        },
+                    ),
+                    rx.button(
                         "마이페이지",
                         on_click=rx.redirect("/mypage"),
                         background_color="rgba(255, 255, 255, 0.2)",

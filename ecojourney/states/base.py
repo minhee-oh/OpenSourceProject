@@ -59,4 +59,3 @@ class BaseState(rx.State):
     # 포인트 관련 데이터
     points_breakdown: Dict[str, int] = {}  # 포인트 상세 내역 (절약량, 빈티지, 평균 대비)
     total_points_earned: int = 0  # 총 획득 포인트
-

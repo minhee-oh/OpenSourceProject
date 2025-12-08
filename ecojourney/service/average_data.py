@@ -63,4 +63,3 @@ def compare_with_average(user_emission: float, category: str = None) -> dict:
 
 
 
-

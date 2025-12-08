@@ -236,6 +236,16 @@ Thumbs.db
 
 /CLAUDE.md
 
+# 더미 데이터 및 테스트 데이터
+create_dummy_users.py
+create_dummy_battles.py
+*_dummy*.py
+*_test_data*.py
+test_data/
+dummy_data/
+test_*.db
+*_test.db
+
 
 
 
