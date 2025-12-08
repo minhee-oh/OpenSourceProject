@@ -639,8 +639,8 @@ class CarbonState(AuthState):
     
     # ------------------------------ DB 저장 메서드 ------------------------------
     
-    async def save_carbon_log_to_db(self):
-        """현재 입력된 탄소 배출량을 데이터베이스에 저장"""
+    async def _save_carbon_log_to_db_internal(self):
+        """탄소 로그 저장 내부 로직 (헬퍼 메서드)"""
         # 가장 먼저 로그 출력 (메서드 호출 확인)
         print(f"[저장] 메서드 호출됨! 사용자: {self.current_user_id}, 로그인: {self.is_logged_in}")
         logger.info(f"[저장 시작] ========== 저장 프로세스 시작 ==========")
@@ -745,27 +745,57 @@ class CarbonState(AuthState):
             logger.info(f"[저장] 절약량: {self.total_saved_emission}kg, 절약 금액: {self.saved_money}원")
             print(f"[저장] 절약량: {self.total_saved_emission}kg, 절약 금액: {self.saved_money}원")
             
-            existing_log = None
-            is_new_log = True
             with Session(engine) as session:
                 stmt = select(CarbonLog).where(
                     CarbonLog.student_id == self.current_user_id,
                     CarbonLog.log_date == today
                 )
                 existing_log = session.exec(stmt).first()
-            
-            is_new_log = existing_log is None
-            self.has_today_log = not is_new_log  # 오늘 날짜 로그 존재 여부 업데이트 (표시용)
+                is_new_log = existing_log is None
+                # 오늘 날짜 로그 존재 여부 상태 반영
+                self.has_today_log = not is_new_log
             logger.info(f"[저장] 기존 로그 존재 여부: {not is_new_log}")
             print(f"[저장] 기존 로그 존재 여부: {not is_new_log}, is_new_log={is_new_log}")
             
             # 테스트용: 같은 날에 여러 번 저장 가능 (제한 제거)
             
             print(f"[저장] DB 저장 시작 - total_emission={total_emission}kg")
+            
+            # 포인트 계산 (한 번만 계산)
+            points_earned = await self._calculate_points(total_emission)
+            logger.info(f"[저장] 계산된 포인트: {points_earned}점")
+            
             with Session(engine) as session:
-                if existing_log:
-                    log = existing_log
+                # 사용자 조회
+                user_stmt = select(User).where(User.student_id == self.current_user_id)
+                user = session.exec(user_stmt).first()
+                
+                if not user:
+                    self.save_message = "❌ 사용자 정보를 찾을 수 없습니다."
+                    self.is_save_success = False
+                    logger.error(f"탄소 로그 저장 오류: 사용자 {self.current_user_id}를 찾을 수 없음")
+                    return
+                
+                # 오늘 로그 조회 (같은 세션에서)
+                log_stmt = select(CarbonLog).where(
+                    CarbonLog.student_id == self.current_user_id,
+                    CarbonLog.log_date == today
+                )
+                log = session.exec(log_stmt).first()
+                
+                # 기존 포인트 저장 (로그 업데이트 전)
+                old_points = log.points_earned if log and log.points_earned else 0
+                logger.info(f"[저장] 기존 포인트: {old_points}점, 새 포인트: {points_earned}점")
+                
+                # 로그 생성 또는 업데이트
+                if log:
                     logger.info(f"[저장] 기존 로그 업데이트 (기존 포인트: {log.points_earned})")
+                    log.transport_km = transport_km
+                    log.ac_hours = ac_hours
+                    log.cup_count = cup_count
+                    log.total_emission = total_emission
+                    log.activities_json = activities_json
+                    log.points_earned = points_earned
                 else:
                     log = CarbonLog(
                         student_id=self.current_user_id,
@@ -774,93 +804,67 @@ class CarbonState(AuthState):
                         ac_hours=ac_hours,
                         cup_count=cup_count,
                         total_emission=total_emission,
-                        activities_json=activities_json
+                        activities_json=activities_json,
+                        points_earned=points_earned
                     )
                     logger.info("[저장] 새 로그 생성")
                 
-                log.transport_km = transport_km
-                log.ac_hours = ac_hours
-                log.cup_count = cup_count
-                log.total_emission = total_emission
-                log.activities_json = activities_json
-                
-                # 포인트 지급 내역 저장 (테스트용: 매번 계산하여 저장)
-                # 포인트 계산: 절약량 + 빈티지 제품 + 평균보다 낮은 배출량
-                points_to_save = await self._calculate_points(total_emission)
-                log.points_earned = points_to_save
-                logger.info(f"[저장] 포인트 저장: {points_to_save}점 (is_new_log={is_new_log})")
-                print(f"[저장] 포인트 저장: {points_to_save}점 (is_new_log={is_new_log})")
-                
-                print(f"[저장] session.add() 호출 전")
                 session.add(log)
-                print(f"[저장] session.commit() 호출 전")
-                session.commit()
-                print(f"[저장] session.commit() 완료")
-                session.refresh(log)  # DB에서 최신 데이터 가져오기
-                logger.info(f"[저장] CarbonLog 저장 완료 - ID: {log.id if hasattr(log, 'id') else 'N/A'}, 배출량: {log.total_emission}kg, 포인트: {log.points_earned}점")
-                print(f"[저장] CarbonLog 저장 완료 - 배출량: {log.total_emission}kg, 포인트: {log.points_earned}점")
-            
-            # 사용자 아바타 상태 업데이트 및 포인트 지급
-            points_earned = 0
-            with Session(engine) as session:
-                user_stmt = select(User).where(User.student_id == self.current_user_id)
-                user = session.exec(user_stmt).first()
                 
-                if user:
-                    # 테스트용: 매번 포인트 계산 및 지급
-                    # 포인트 계산: 절약량 + 빈티지 제품 + 평균보다 낮은 배출량
-                    points_earned = await self._calculate_points(total_emission)
-                    
-                    if is_new_log:
-                        # 새로운 로그: 포인트 추가
-                        user.current_points += points_earned
-                    else:
-                        # 기존 로그 업데이트: 기존 포인트를 빼고 새 포인트 추가
-                        old_points = existing_log.points_earned if existing_log else 0
-                        user.current_points = user.current_points - old_points + points_earned
-                    
-                    self.current_user_points = user.current_points
-                    
-                    if points_earned > 0:
-                        # 포인트 획득 이유 메시지 생성
-                        reasons = []
-                        if self.total_saved_emission > 0:
-                            reasons.append(f"절약량 {self.total_saved_emission}kg")
-                        # 빈티지 제품 사용 확인
-                        vintage_count = sum(int(act.get("value", 0)) for act in self.all_activities 
-                                          if act.get("category") == "의류" 
-                                          and act.get("sub_category") == "빈티지")
-                        if vintage_count > 0:
-                            reasons.append(f"빈티지 제품 {vintage_count}개")
-                        # 평균보다 낮은 배출량 확인
-                        from ..service.average_data import get_total_average
-                        avg_emission = get_total_average()
-                        if total_emission < avg_emission:
-                            diff = avg_emission - total_emission
-                            reasons.append(f"평균보다 {diff:.1f}kg 낮음")
-                        
-                        reason_text = ", ".join(reasons) if reasons else "환경 친화적 활동"
-                        self.save_message = f"✅ 저장 완료! {reason_text}으로 {points_earned}점을 획득했습니다."
-                    else:
-                        self.save_message = "✅ 저장 완료!"
-                    
-                    self.is_save_success = True
-                    self.has_today_log = True  # 저장 완료 후 오늘 날짜 로그 존재 표시
-                    session.add(user)
-                    session.commit()
-                    session.refresh(user)  # DB에서 최신 데이터 가져오기
-                    logger.info(f"[저장 완료] 사용자: {self.current_user_id}, 배출량: {total_emission}kg, 절약량: {self.total_saved_emission}kg, 포인트: {points_earned}점 (총 포인트: {user.current_points})")
-                    logger.info(f"[저장 완료] DB 확인 - 사용자 포인트: {user.current_points}점, 로그 포인트: {log.points_earned}점")
+                # 사용자 포인트 업데이트 (같은 세션에서)
+                if is_new_log:
+                    # 새로운 로그: 포인트 추가
+                    user.current_points += points_earned
+                    logger.info(f"[저장] 새 로그 - 포인트 추가: {user.current_points - points_earned} + {points_earned} = {user.current_points}")
                 else:
-                    self.save_message = "❌ 사용자 정보를 찾을 수 없습니다."
-                    self.is_save_success = False
-                    logger.error(f"탄소 로그 저장 오류: 사용자 {self.current_user_id}를 찾을 수 없음")
+                    # 기존 로그 업데이트: 기존 포인트를 빼고 새 포인트 추가
+                    user.current_points = user.current_points - old_points + points_earned
+                    logger.info(f"[저장] 기존 로그 업데이트 - 포인트 조정: {user.current_points + old_points - points_earned} - {old_points} + {points_earned} = {user.current_points}")
+                
+                self.current_user_points = user.current_points
+                session.add(user)
+                
+                # 한 번에 commit
+                session.commit()
+                session.refresh(log)
+                session.refresh(user)
+                
+                logger.info(f"[저장 완료] 사용자: {self.current_user_id}, 배출량: {total_emission}kg, 절약량: {self.total_saved_emission}kg, 포인트: {points_earned}점 (총 포인트: {user.current_points})")
+                logger.info(f"[저장 완료] DB 확인 - 사용자 포인트: {user.current_points}점, 로그 포인트: {log.points_earned}점")
+                
+                if points_earned > 0:
+                    # 포인트 획득 이유 메시지 생성
+                    reasons = []
+                    if self.total_saved_emission > 0:
+                        reasons.append(f"절약량 {self.total_saved_emission}kg")
+                    # 빈티지 제품 사용 확인
+                    vintage_count = sum(int(act.get("value", 0)) for act in self.all_activities 
+                                      if act.get("category") == "의류" 
+                                      and act.get("sub_category") == "빈티지")
+                    if vintage_count > 0:
+                        reasons.append(f"빈티지 제품 {vintage_count}개")
+                    # 평균보다 낮은 배출량 확인
+                    from ..service.average_data import get_total_average
+                    avg_emission = get_total_average()
+                    if total_emission < avg_emission:
+                        diff = avg_emission - total_emission
+                        reasons.append(f"평균보다 {diff:.1f}kg 낮음")
+                    
+                    reason_text = ", ".join(reasons) if reasons else "환경 친화적 활동"
+                    self.save_message = f"✅ 저장 완료! {reason_text}으로 {points_earned}점을 획득했습니다."
+                else:
+                    self.save_message = "✅ 저장 완료!"
+                
+                self.is_save_success = True
+                self.has_today_log = True  # 저장 완료 후 오늘 날짜 로그 존재 표시
             
             self.is_saving = False
             
             # 저장 성공 시 마이페이지 데이터 새로고침 (포인트 로그 업데이트)
             if self.is_save_success:
                 try:
+                    # 주간 챌린지 진행도 업데이트는 ChallengeState에서 오버라이드된 save_carbon_log_to_db에서 처리됨
+
                     # 사용자 포인트 정보 새로고침
                     with Session(engine) as session:
                         user_stmt = select(User).where(User.student_id == self.current_user_id)
@@ -891,6 +895,10 @@ class CarbonState(AuthState):
             print(f"[저장 오류] 예외 발생: {e}")
             import traceback
             print(f"[저장 오류] 스택 트레이스:\n{traceback.format_exc()}")
+    
+    async def save_carbon_log_to_db(self):
+        """현재 입력된 탄소 배출량을 데이터베이스에 저장"""
+        await self._save_carbon_log_to_db_internal()
     
     async def load_saved_logs_history(self):
         """저장된 로그 이력을 불러옵니다."""

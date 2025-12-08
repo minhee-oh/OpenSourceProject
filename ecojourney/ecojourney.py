@@ -2,6 +2,7 @@ import reflex as rx
 from .states import AppState
 from .pages.home import home_page
 from .pages.intro import intro_page
+from .pages.info import info_page
 from .pages.auth import auth_page
 from .pages.transportation import transportation_page
 from .pages.food import food_page
@@ -27,6 +28,8 @@ app.add_page(home_page, route="/", title="EcoJourney | 시작")
 
 # 2. 서비스 소개 화면 라우팅
 app.add_page(intro_page, route="/intro", title="EcoJourney | 소개")
+# 2-1. 정보글 페이지
+app.add_page(info_page, route="/info", title="EcoJourney | 정보글", on_load=AppState.load_active_challenges)
 
 # 2-1. 로그인/회원가입 화면 라우팅
 app.add_page(auth_page, route="/auth", title="EcoJourney | 로그인")
