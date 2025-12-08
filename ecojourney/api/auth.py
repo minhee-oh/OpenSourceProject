@@ -5,7 +5,7 @@ from ecojourney.schemas.user import UserCreate, UserLogin, User
 from ecojourney.ai.services.auth_service import (
     create_user,
     verify_user,
-    get_user,  # 👈 이렇게 그냥 get_user로 가져오자
+    get_user,  
 )
 
 
