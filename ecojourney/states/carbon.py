@@ -62,19 +62,32 @@ class CarbonState(AuthState):
     show_fruit: bool = False
     show_pasta: bool = False
     food_input_mode: bool = False
+
+    # 2단계 입력 모드 추가
+    food_step: int = 0  # 0: 카테고리 선택, 1: 세부 카테고리 선택, 2: 횟수 입력
+
+    # 선택된 세부 카테고리 저장
+    selected_dairy_subs: List[str] = []
+    selected_rice_subs: List[str] = []
+    selected_coffee_subs: List[str] = []
+    selected_fastfood_subs: List[str] = []
+    selected_noodles_subs: List[str] = []
+    selected_cooked_subs: List[str] = []
+    selected_side_dish_subs: List[str] = []
+    selected_grilled_meat_subs: List[str] = []
+    selected_fruit_subs: List[str] = []
+    selected_pasta_subs: List[str] = []
     
     # ---------- 의류 선택 상태 ----------
     selected_tshirts: bool = False
     selected_jeans: bool = False
     selected_shoes: bool = False
-    selected_socks: bool = False
-    selected_cap: bool = False
+    selected_acc: bool = False
 
     show_tshirts: bool = False
     show_jeans: bool = False
     show_shoes: bool = False
-    show_socks: bool = False
-    show_cap: bool = False
+    show_acc: bool = False
 
     clothing_input_mode: bool = False
 
@@ -112,6 +125,11 @@ class CarbonState(AuthState):
     show_can: bool = False
 
     waste_input_mode: bool = False
+    
+    # ---------- 리포트 페이지 UI 상태 ----------
+    show_analysis_detail: bool = False
+    show_suggestions_detail: bool = False
+    
     # ------------------------------ 교통 관련 메서드 ------------------------------
     
     def toggle_car(self):
@@ -137,6 +155,20 @@ class CarbonState(AuthState):
         self.show_walk = self.selected_walk
         self.show_bike = self.selected_bike
         self.trans_input_mode = True
+
+    def reset_transport_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.trans_input_mode = False
+        self.selected_car = False
+        self.selected_bus = False
+        self.selected_subway = False
+        self.selected_walk = False
+        self.selected_bike = False
+        self.show_car = False
+        self.show_bus = False
+        self.show_subway = False
+        self.show_walk = False
+        self.show_bike = False
     
     def handle_transport_submit(self, form_data: dict):
         """교통 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
@@ -238,7 +270,7 @@ class CarbonState(AuthState):
         self.selected_pasta = not self.selected_pasta
 
     def show_food_input_fields(self):
-        """선택된 음식 항목들의 입력 필드를 표시"""
+        """선택된 음식 항목들의 입력 필드를 표시 (1단계: 세부 카테고리 선택)"""
         self.show_dairy = self.selected_dairy
         self.show_rice = self.selected_rice
         self.show_coffee = self.selected_coffee
@@ -250,130 +282,68 @@ class CarbonState(AuthState):
         self.show_fruit = self.selected_fruit
         self.show_pasta = self.selected_pasta
         self.food_input_mode = True
+        self.food_step = 1  # 세부 카테고리 선택 단계로 이동
 
-    def handle_food_submit(self, form_data: dict):
-        """음식 입력값 제출 처리"""
-        # 기존 음식 데이터 제거
-        self.all_activities = [
-            act for act in self.all_activities
-            if act.get("category") != "식품"
-        ]
+    def toggle_food_subcategory(self, category: str, subcategory: str):
+        """세부 카테고리 토글 (체크박스 선택/해제)"""
+        if category == "유제품":
+            if subcategory in self.selected_dairy_subs:
+                self.selected_dairy_subs.remove(subcategory)
+            else:
+                self.selected_dairy_subs.append(subcategory)
+        elif category == "밥":
+            if subcategory in self.selected_rice_subs:
+                self.selected_rice_subs.remove(subcategory)
+            else:
+                self.selected_rice_subs.append(subcategory)
+        elif category == "커피":
+            if subcategory in self.selected_coffee_subs:
+                self.selected_coffee_subs.remove(subcategory)
+            else:
+                self.selected_coffee_subs.append(subcategory)
+        elif category == "패스트푸드":
+            if subcategory in self.selected_fastfood_subs:
+                self.selected_fastfood_subs.remove(subcategory)
+            else:
+                self.selected_fastfood_subs.append(subcategory)
+        elif category == "면":
+            if subcategory in self.selected_noodles_subs:
+                self.selected_noodles_subs.remove(subcategory)
+            else:
+                self.selected_noodles_subs.append(subcategory)
+        elif category == "국/찌개":
+            if subcategory in self.selected_cooked_subs:
+                self.selected_cooked_subs.remove(subcategory)
+            else:
+                self.selected_cooked_subs.append(subcategory)
+        elif category == "반찬":
+            if subcategory in self.selected_side_dish_subs:
+                self.selected_side_dish_subs.remove(subcategory)
+            else:
+                self.selected_side_dish_subs.append(subcategory)
+        elif category == "고기":
+            if subcategory in self.selected_grilled_meat_subs:
+                self.selected_grilled_meat_subs.remove(subcategory)
+            else:
+                self.selected_grilled_meat_subs.append(subcategory)
+        elif category == "과일":
+            if subcategory in self.selected_fruit_subs:
+                self.selected_fruit_subs.remove(subcategory)
+            else:
+                self.selected_fruit_subs.append(subcategory)
+        elif category == "파스타":
+            if subcategory in self.selected_pasta_subs:
+                self.selected_pasta_subs.remove(subcategory)
+            else:
+                self.selected_pasta_subs.append(subcategory)
 
-        food_data = []
+    def proceed_to_quantity_input(self):
+        """세부 카테고리 선택 완료 후 횟수 입력 단계로 이동"""
+        self.food_step = 2
 
-        if self.show_dairy and form_data.get("dairy_value"):
-            # 유제품류: 우유/치즈/두유를 activity_type으로 저장
-            dairy_sub = form_data.get("dairy_sub") or "우유"
-            food_data.append({
-                "category": "식품",
-                "activity_type": dairy_sub,
-                "subcategory": "유제품류",
-                "value": float(form_data.get("dairy_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_rice and form_data.get("rice_value"):
-            # 쌀밥: 세부 선택을 activity_type으로 저장
-            rice_sub = form_data.get("rice_sub") or "쌀밥"
-            food_data.append({
-                "category": "식품",
-                "activity_type": rice_sub,
-                "subcategory": "쌀밥",
-                "value": float(form_data.get("rice_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_coffee and form_data.get("coffee_value"):
-            # 커피: 한국일보 기준만 (에스프레소, 카페라떼한국)
-            coffee_sub = form_data.get("coffee_sub") or "에스프레소"
-            food_data.append({
-                "category": "식품",
-                "activity_type": coffee_sub,
-                "subcategory": "커피",
-                "value": float(form_data.get("coffee_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_fastfood and form_data.get("fastfood_value"):
-            # 패스트푸드: 한국일보 기준만 (피자한국, 햄버거세트, 후라이드치킨)
-            fastfood_sub = form_data.get("fastfood_sub") or "피자한국"
-            food_data.append({
-                "category": "식품",
-                "activity_type": fastfood_sub,
-                "subcategory": "패스트푸드",
-                "value": float(form_data.get("fastfood_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_noodles and form_data.get("noodles_value"):
-            # 면류: 한국일보 기준만 (물냉면, 비빔냉면, 잔치국수, 비빔국수, 해물칼국수)
-            noodles_sub = form_data.get("noodles_sub") or "물냉면"
-            food_data.append({
-                "category": "식품",
-                "activity_type": noodles_sub,
-                "subcategory": "면류",
-                "value": float(form_data.get("noodles_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_cooked and form_data.get("cooked_value"):
-            # 조리된 음식: 한국일보 기준만 (된장국, 미역국, 콩나물국, 된장찌개, 김치찌개, 순두부찌개, 설렁탕, 갈비탕, 곰탕)
-            cooked_sub = form_data.get("cooked_sub") or "된장국"
-            food_data.append({
-                "category": "식품",
-                "activity_type": cooked_sub,
-                "subcategory": "국/찌개",
-                "value": float(form_data.get("cooked_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_side_dish and form_data.get("side_dish_value"):
-            # 반찬: 세부 선택을 activity_type으로 저장
-            side_dish_sub = form_data.get("side_dish_sub") or "배추김치"
-            food_data.append({
-                "category": "식품",
-                "activity_type": side_dish_sub,
-                "subcategory": "반찬",
-                "value": float(form_data.get("side_dish_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_grilled_meat and form_data.get("grilled_meat_value"):
-            # 고기: 세부 선택을 activity_type으로 저장
-            grilled_meat_sub = form_data.get("grilled_meat_sub") or "소고기구이"
-            food_data.append({
-                "category": "식품",
-                "activity_type": grilled_meat_sub,
-                "subcategory": "고기",
-                "value": float(form_data.get("grilled_meat_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_fruit and form_data.get("fruit_value"):
-            # 과일: 세부 선택을 activity_type으로 저장
-            fruit_sub = form_data.get("fruit_sub") or "딸기"
-            food_data.append({
-                "category": "식품",
-                "activity_type": fruit_sub,
-                "subcategory": "과일",
-                "value": float(form_data.get("fruit_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_pasta and form_data.get("pasta_value"):
-            # 파스타: 한끼 기준 로컬 계산
-            pasta_sub = form_data.get("pasta_sub") or "카르보나라"
-            food_data.append({
-                "category": "식품",
-                "activity_type": pasta_sub,
-                "subcategory": "파스타",
-                "value": float(form_data.get("pasta_value", 0)),
-                "unit": "회",
-            })
-
-        self.all_activities = self.all_activities + food_data
-
-        # 입력모드 종료 + 선택 초기화
+    def reset_food_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.food_step = 0
         self.food_input_mode = False
         self.selected_dairy = False
         self.selected_rice = False
@@ -395,6 +365,192 @@ class CarbonState(AuthState):
         self.show_grilled_meat = False
         self.show_fruit = False
         self.show_pasta = False
+        self.selected_dairy_subs = []
+        self.selected_rice_subs = []
+        self.selected_coffee_subs = []
+        self.selected_fastfood_subs = []
+        self.selected_noodles_subs = []
+        self.selected_cooked_subs = []
+        self.selected_side_dish_subs = []
+        self.selected_grilled_meat_subs = []
+        self.selected_fruit_subs = []
+        self.selected_pasta_subs = []
+
+    def handle_food_submit(self, form_data: dict):
+        """음식 입력값 제출 처리 (다중 선택 지원)"""
+        # 기존 음식 데이터 제거
+        self.all_activities = [
+            act for act in self.all_activities
+            if act.get("category") != "식품"
+        ]
+
+        food_data = []
+
+        # 유제품 처리
+        if self.show_dairy:
+            for dairy_sub in self.selected_dairy_subs:
+                value_key = f"dairy_{dairy_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": dairy_sub,
+                        "subcategory": "유제품류",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 밥 처리
+        if self.show_rice:
+            for rice_sub in self.selected_rice_subs:
+                value_key = f"rice_{rice_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": rice_sub,
+                        "subcategory": "쌀밥",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 커피 처리
+        if self.show_coffee:
+            for coffee_sub in self.selected_coffee_subs:
+                value_key = f"coffee_{coffee_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": coffee_sub,
+                        "subcategory": "커피",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 패스트푸드 처리
+        if self.show_fastfood:
+            for fastfood_sub in self.selected_fastfood_subs:
+                value_key = f"fastfood_{fastfood_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": fastfood_sub,
+                        "subcategory": "패스트푸드",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 면 처리
+        if self.show_noodles:
+            for noodles_sub in self.selected_noodles_subs:
+                value_key = f"noodles_{noodles_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": noodles_sub,
+                        "subcategory": "면류",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 국/찌개 처리
+        if self.show_cooked:
+            for cooked_sub in self.selected_cooked_subs:
+                value_key = f"cooked_{cooked_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": cooked_sub,
+                        "subcategory": "국/찌개",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 반찬 처리
+        if self.show_side_dish:
+            for side_dish_sub in self.selected_side_dish_subs:
+                value_key = f"side_dish_{side_dish_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": side_dish_sub,
+                        "subcategory": "반찬",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 고기 처리
+        if self.show_grilled_meat:
+            for grilled_meat_sub in self.selected_grilled_meat_subs:
+                value_key = f"grilled_meat_{grilled_meat_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": grilled_meat_sub,
+                        "subcategory": "고기",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 과일 처리
+        if self.show_fruit:
+            for fruit_sub in self.selected_fruit_subs:
+                value_key = f"fruit_{fruit_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": fruit_sub,
+                        "subcategory": "과일",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 파스타 처리
+        if self.show_pasta:
+            for pasta_sub in self.selected_pasta_subs:
+                value_key = f"pasta_{pasta_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": pasta_sub,
+                        "subcategory": "파스타",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        self.all_activities = self.all_activities + food_data
+
+        # 입력모드 종료 + 선택 초기화
+        self.food_input_mode = False
+        self.food_step = 0
+        self.selected_dairy = False
+        self.selected_rice = False
+        self.selected_coffee = False
+        self.selected_fastfood = False
+        self.selected_noodles = False
+        self.selected_cooked = False
+        self.selected_side_dish = False
+        self.selected_grilled_meat = False
+        self.selected_fruit = False
+        self.selected_pasta = False
+        self.show_dairy = False
+        self.show_rice = False
+        self.show_coffee = False
+        self.show_fastfood = False
+        self.show_noodles = False
+        self.show_cooked = False
+        self.show_side_dish = False
+        self.show_grilled_meat = False
+        self.show_fruit = False
+        self.show_pasta = False
+        self.selected_dairy_subs = []
+        self.selected_rice_subs = []
+        self.selected_coffee_subs = []
+        self.selected_fastfood_subs = []
+        self.selected_noodles_subs = []
+        self.selected_cooked_subs = []
+        self.selected_side_dish_subs = []
+        self.selected_grilled_meat_subs = []
+        self.selected_fruit_subs = []
+        self.selected_pasta_subs = []
 
         return rx.redirect("/input/clothing")
     
@@ -409,20 +565,28 @@ class CarbonState(AuthState):
     def toggle_shoes(self):
         self.selected_shoes = not self.selected_shoes
     
-    def toggle_socks(self):
-        self.selected_socks = not self.selected_socks
-    
-    def toggle_cap(self):
-        self.selected_cap = not self.selected_cap
+    def toggle_acc(self):
+        self.selected_acc = not self.selected_acc
     
     def show_clothing_input_fields(self):
         """선택된 항목들의 입력 필드를 표시"""
         self.show_tshirts = self.selected_tshirts
         self.show_jeans = self.selected_jeans
         self.show_shoes = self.selected_shoes
-        self.show_socks = self.selected_socks
-        self.show_cap = self.selected_cap
+        self.show_acc = self.selected_acc
         self.clothing_input_mode = True
+
+    def reset_clothing_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.clothing_input_mode = False
+        self.selected_tshirts = False
+        self.selected_jeans = False
+        self.selected_shoes = False
+        self.selected_acc = False
+        self.show_tshirts = False
+        self.show_jeans = False
+        self.show_shoes = False
+        self.show_acc = False
     
     def handle_clothing_submit(self, form_data: dict):
         """의류 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
@@ -458,20 +622,12 @@ class CarbonState(AuthState):
                 "sub": form_data.get("shoes_sub", ""),
             })
         
-        if self.show_socks and form_data.get("socks_value"):
+        if self.show_acc and form_data.get("acc_value"):
             clothing_data.append({
                 "category": "의류",
-                "activity_type": "양말",
-                "value": float(form_data.get("socks_value", 0)),
-                "sub": form_data.get("socks_sub", ""),
-            })
-        
-        if self.show_cap and form_data.get("cap_value"):
-            clothing_data.append({
-                "category": "의류",
-                "activity_type": "모자",
-                "value": float(form_data.get("cap_value", 0)),
-                "sub": form_data.get("cap_sub", ""),
+                "activity_type": "가방/잡화",
+                "value": float(form_data.get("acc_value", 0)),
+                "sub": form_data.get("acc_sub", ""),
             })
         
         self.all_activities = self.all_activities + clothing_data
@@ -481,13 +637,11 @@ class CarbonState(AuthState):
         self.selected_tshirts = False
         self.selected_jeans = False
         self.selected_shoes = False
-        self.selected_socks = False
-        self.selected_cap = False
+        self.selected_acc = False
         self.show_tshirts = False
         self.show_jeans = False
         self.show_shoes = False
-        self.show_socks = False
-        self.show_cap = False
+        self.show_acc = False
         
         return rx.redirect("/input/electricity")
     
@@ -504,6 +658,14 @@ class CarbonState(AuthState):
         self.show_ac = self.selected_ac
         self.show_heater = self.selected_heater
         self.electricity_input_mode = True
+
+    def reset_electricity_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.electricity_input_mode = False
+        self.selected_ac = False
+        self.selected_heater = False
+        self.show_ac = False
+        self.show_heater = False
     
     def handle_electricity_submit(self, form_data: dict):
         """전기 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
@@ -557,6 +719,16 @@ class CarbonState(AuthState):
         self.show_dish = self.selected_dish
         self.show_laundry = self.selected_laundry
         self.water_input_mode = True
+
+    def reset_water_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.water_input_mode = False
+        self.selected_shower = False
+        self.selected_dish = False
+        self.selected_laundry = False
+        self.show_shower = False
+        self.show_dish = False
+        self.show_laundry = False
     
     def handle_water_submit(self, form_data: dict):
         """물 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
@@ -630,6 +802,20 @@ class CarbonState(AuthState):
         self.show_glass = self.selected_glass
         self.show_can = self.selected_can
         self.waste_input_mode = True
+
+    def reset_waste_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.waste_input_mode = False
+        self.selected_general = False
+        self.selected_plastic = False
+        self.selected_paper = False
+        self.selected_glass = False
+        self.selected_can = False
+        self.show_general = False
+        self.show_plastic = False
+        self.show_paper = False
+        self.show_glass = False
+        self.show_can = False
     
     def handle_waste_submit(self, form_data: dict):
         """쓰레기 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
@@ -698,10 +884,47 @@ class CarbonState(AuthState):
         
         return rx.redirect("/report")
     
+    # ------------------------------ 리포트 페이지 UI 관련 메서드 ------------------------------
+    
+    @rx.var
+    def average_bar_height(self) -> int:
+        """한국인 평균 막대 높이 계산"""
+        if not self.total_average_comparison:
+            return 130
+        avg = float(self.total_average_comparison.get('average', 0) or 0)
+        user = float(self.total_average_comparison.get('user', 0) or 0)
+        max_val = max(avg, user, 1)
+        return int((avg / max_val) * 130)
+
+    @rx.var
+    def user_bar_height(self) -> int:
+        """사용자 배출량 막대 높이 계산"""
+        if not self.total_average_comparison:
+            return 0
+        avg = float(self.total_average_comparison.get('average', 0) or 0)
+        user = float(self.total_average_comparison.get('user', 0) or 0)
+        max_val = max(avg, user, 1)
+        return int((user / max_val) * 130)
+
+    def toggle_analysis_detail(self):
+        """분석 결과 카드 펼치기/접기"""
+        self.show_analysis_detail = not self.show_analysis_detail
+
+    def toggle_suggestions_detail(self):
+        """탄소 저감 제안 카드 펼치기/접기"""
+        self.show_suggestions_detail = not self.show_suggestions_detail
+    
     # ------------------------------ 리포트 계산 메서드 ------------------------------
     
     async def calculate_report(self):
         """리포트 페이지에서 전체 탄소 배출량을 계산합니다."""
+
+        print(f"=" * 50)
+        print(f"[리포트 계산] 시작!")
+        print(f"[리포트 계산] all_activities 개수: {len(self.all_activities)}")
+        print(f"[리포트 계산] all_activities 내용: {self.all_activities}")
+        print(f"=" * 50)
+
         logger.info("[리포트 계산] 시작 - 전체 활동 데이터 계산 중...")
         
         try:
@@ -1457,27 +1680,40 @@ class CarbonState(AuthState):
             
             svg_parts = []
             svg_parts.append('<svg width="200" height="200" viewBox="0 0 200 200">')
+            
+            # 배경 원 (회색)
             svg_parts.append('<circle cx="100" cy="100" r="80" fill="none" stroke="#e5e7eb" stroke-width="20"/>')
             
-            cumulative_percentage = 0
+            circumference = 2 * 3.14159 * 80  # 원의 둘레
+            cumulative_offset = 0  # 누적 오프셋
+            
             for item in self.category_emission_list:
                 percentage = item["percentage"]
                 if percentage > 0:
-                    circumference = 2 * 3.14159 * 80
+                    # 이 세그먼트의 길이
                     dash_length = circumference * (percentage / 100)
-                    dash_offset = circumference * (cumulative_percentage / 100)
-                    rotation = -90 + (cumulative_percentage * 360 / 100)
+                    
+                    # stroke-dashoffset: 시작점을 얼마나 이동할지
+                    # 음수로 설정하면 시계 방향으로 이동
+                    offset = -cumulative_offset
                     
                     svg_parts.append(
                         f'<circle cx="100" cy="100" r="80" fill="none" stroke="{item["color"]}" '
-                        f'stroke-width="20" stroke-dasharray="{dash_length} {circumference}" '
-                        f'stroke-dashoffset="{dash_offset}" transform="rotate({rotation} 100 100)"/>'
+                        f'stroke-width="20" '
+                        f'stroke-dasharray="{dash_length} {circumference}" '
+                        f'stroke-dashoffset="{offset}" '
+                        f'transform="rotate(-90 100 100)"/>'
                     )
-                    cumulative_percentage += percentage
+                    
+                    # 다음 세그먼트를 위해 누적
+                    cumulative_offset += dash_length
+            
+            # 중앙 흰색 원 (도넛 구멍)
+            svg_parts.append('<circle cx="100" cy="100" r="60" fill="white"/>')
             
             # 중앙 텍스트
-            svg_parts.append('<text x="100" y="95" text-anchor="middle" font-size="14" font-weight="bold" fill="#374151">총 배출량</text>')
-            svg_parts.append(f'<text x="100" y="115" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e40af">{self.total_carbon_emission:.2f}kg</text>')
+            svg_parts.append('<text x="100" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#374151">총 배출량</text>')
+            svg_parts.append(f'<text x="100" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="#1e40af">{self.total_carbon_emission:.2f}kg</text>')
             svg_parts.append('</svg>')
             
             self.donut_chart_svg = ''.join(svg_parts)
@@ -1524,4 +1760,17 @@ class CarbonState(AuthState):
             self.ai_alternatives = []
         finally:
             self.is_loading_ai = False
-
+    
+    async def on_report_page_load(self):
+        """리포트 페이지 로드 시 자동으로 계산 및 AI 분석 실행"""
+        print("[리포트 페이지] 자동 계산 시작...")
+        
+        # 1. 리포트 계산이 안 되어 있으면 계산
+        if not self.is_report_calculated:
+            await self.calculate_report()
+        
+        # 2. AI 분석이 안 되어 있으면 자동 시작
+        if self.is_report_calculated and self.ai_analysis_result == "":
+            await self.generate_ai_analysis()
+        
+        print("[리포트 페이지] 자동 계산 및 AI 분석 완료")
