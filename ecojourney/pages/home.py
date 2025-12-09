@@ -8,7 +8,7 @@ def header() -> rx.Component:
     return rx.box(
         rx.hstack(
             rx.button(
-                "EcoJourney",
+                "ECOJOURNEY",
                 on_click=rx.redirect("/"),
                 background_color="transparent",   # 버튼 배경 제거
                 color="white",

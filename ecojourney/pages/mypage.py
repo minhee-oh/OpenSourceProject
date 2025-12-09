@@ -5,14 +5,13 @@ from ecojourney.state import AppState
 from typing import Dict, Any
 
 def header() -> rx.Component:
-    """공통 헤더"""
     return rx.box(
         rx.hstack(
             rx.button(
-                "EcoJourney",
+                "ECOJOURNEY",
                 on_click=rx.redirect("/"),
                 background_color="transparent",
-                color="white",
+                color="#FFFFFF",
                 font_size="1.5em",
                 font_weight="bold",
                 padding="0",
@@ -24,57 +23,71 @@ def header() -> rx.Component:
                 AppState.is_logged_in,
                 rx.hstack(
                     rx.button(
-                        "정보글",
+                        "챌린지",
                         on_click=rx.redirect("/info"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
+                        background_color="transparent",
+                        color="#FFFFFF",
+                        border="none",
+                        border_radius="25px",
                         padding="8px 20px",
+                        font_weight="500",
                         _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
+                            "border": "1px solid #FFFFFF",
                         },
                     ),
                     rx.button(
-                        "대결",
+                        "배틀",
                         on_click=rx.redirect("/battle"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
+                        background_color="transparent",
+                        color="#FFFFFF",
+                        border="none",
+                        border_radius="25px",
                         padding="8px 20px",
+                        font_weight="500",
                         _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
+                            "border": "1px solid #FFFFFF",
                         },
                     ),
                     rx.button(
                         "랭킹",
                         on_click=rx.redirect("/ranking"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
+                        background_color="transparent",
+                        color="#FFFFFF",
+                        border="none",
+                        border_radius="25px",
                         padding="8px 20px",
+                        font_weight="500",
                         _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
+                            "border": "1px solid #FFFFFF",
                         },
+                    ),
+                    rx.button(
+                        "마이페이지",
+                        on_click=rx.redirect("/mypage"),
+                        background_color="transparent",
+                        color="#FFFFFF",
+                        border="1px solid #FFFFFF",
+                        border_radius="25px",
+                        padding="8px 20px",
+                        font_weight="500",
                     ),
                     rx.text(
                         f"{AppState.current_user_id}님",
-                        color="white",
+                        color="#FFFFFF",
                         font_size="1em",
                         margin_right="10px",
                     ),
                     rx.button(
                         "로그아웃",
                         on_click=AppState.logout,
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
+                        background_color="#FFFFFF",
+                        color="#4DAB75",
+                        border="1px solid #4DAB75",
+                        border_radius="25px",
                         padding="8px 20px",
+                        font_weight="500",
                         _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
+                            "background_color": "rgba(255, 255, 255, 0.9)",
                         },
                     ),
                     spacing="3",
@@ -83,32 +96,34 @@ def header() -> rx.Component:
                 rx.button(
                     "로그인",
                     on_click=rx.redirect("/auth"),
-                    background_color="rgba(255, 255, 255, 0.2)",
-                    color="white",
-                    border="1px solid rgba(255, 255, 255, 0.3)",
-                    border_radius="20px",
+                    background_color="#FFFFFF",
+                    color="#4DAB75",
+                    border="1px solid #4DAB75",
+                    border_radius="25px",
                     padding="8px 20px",
+                    font_weight="500",
                     _hover={
-                        "background_color": "rgba(255, 255, 255, 0.3)",
+                        "background_color": "rgba(255, 255, 255, 0.9)",
                     },
                 ),
             ),
             justify="between",
             align="center",
-            padding="1em 2em",
+            padding="1.5em 3em",
         ),
         width="100%",
         position="relative",
         z_index="10",
-        background_color="transparent",
+        background_color="#4DAB75",
+        border_bottom="1px solid rgba(255, 255, 255, 0.1)",
     )
 
 def mypage_page() -> rx.Component:
     """마이페이지 컴포넌트"""
     # 페이지 로드 시 통계 데이터 로드
-    return rx.center(
+    return rx.box(
+        header(),
         rx.vstack(
-            header(),
             
             rx.cond(
                 AppState.is_logged_in,
@@ -513,7 +528,7 @@ def mypage_page() -> rx.Component:
             width="100%",
             min_height="100vh",
             padding="20px",
-            background="linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background="#F8F9FA",
         ),
         width="100%",
         min_height="100vh",
