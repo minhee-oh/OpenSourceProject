@@ -231,7 +231,8 @@ class BattleState(CarbonState):
                     college_b=college_b,
                     score_a=0,
                     score_b=0,
-                    status="ACTIVE"
+                    status="ACTIVE",
+                    created_at=datetime.now()
                 )
                 session.add(new_battle)
                 battles_created += 1
@@ -364,7 +365,8 @@ class BattleState(CarbonState):
                     battle_id=battle_id,
                     student_id=self.current_user_id,
                     bet_amount=self.battle_bet_amount,
-                    reward_amount=0
+                    reward_amount=0,
+                    joined_at=datetime.now()
                 )
                 session.add(participant)
                 

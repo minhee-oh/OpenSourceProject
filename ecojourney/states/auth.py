@@ -4,6 +4,7 @@
 
 import reflex as rx
 from typing import Optional
+from datetime import datetime
 import hashlib
 import logging
 from .base import BaseState
@@ -65,7 +66,8 @@ class AuthState(BaseState):
                 student_id=self.signup_student_id,
                 password=hashed_password,
                 college=self.signup_college,
-                current_points=0
+                current_points=0,
+                created_at=datetime.now()
             )
             
             try:

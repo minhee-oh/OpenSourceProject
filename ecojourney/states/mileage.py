@@ -4,6 +4,7 @@
 
 import reflex as rx
 from typing import List, Dict, Any
+from datetime import datetime
 import logging
 from .battle import BattleState
 from ..models import MileageRequest, User
@@ -51,7 +52,8 @@ class MileageState(BattleState):
                 student_id=self.current_user_id,
                 request_points=self.mileage_request_points,
                 converted_mileage=converted_mileage,
-                status="APPROVED"  # 테스트용 자동 승인
+                status="APPROVED",  # 테스트용 자동 승인
+                processed_at=datetime.now()
             )
             await request.save()
             

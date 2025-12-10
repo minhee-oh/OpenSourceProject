@@ -4,7 +4,7 @@
 
 import reflex as rx
 from typing import Dict, List, Any, Optional
-from datetime import date
+from datetime import date, datetime
 import logging
 from .base import BaseState
 from .auth import AuthState
@@ -805,7 +805,8 @@ class CarbonState(AuthState):
                         cup_count=cup_count,
                         total_emission=total_emission,
                         activities_json=activities_json,
-                        points_earned=points_earned
+                        points_earned=points_earned,
+                        created_at=datetime.now()
                     )
                     logger.info("[저장] 새 로그 생성")
                 

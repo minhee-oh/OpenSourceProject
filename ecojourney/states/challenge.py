@@ -64,6 +64,7 @@ class ChallengeState(BattleState):
                         goal_value=item["goal_value"],
                         reward_points=item["reward_points"],
                         is_active=True,
+                        created_at=datetime.now()
                     )
                     session.add(ch)
                     created += 1
