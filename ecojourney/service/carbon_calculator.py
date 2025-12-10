@@ -245,7 +245,8 @@ def calculate_carbon_emission(
                 value=value,
                 unit=unit,
                 converted_value=converted_value,
-                standard_unit=standard_unit
+                standard_unit=standard_unit,
+                sub_category=sub_category
             )
             if carbon_emission is not None:
                 calculation_method = "api"

@@ -672,7 +672,7 @@ def calculate_food_by_name(food_name: str, weight_kg: float = None, servings: fl
 # ---------------------------------------------------------
 
 
-def calculate_clothing_emission(item_type: str, count: int) -> float:
+def calculate_clothing_emission(item_type: str, count: int, sub_category: str = None) -> float:
     """
     의류/패션 아이템 개수에 따른 탄소 배출량 계산.
     무게 추정을 통해 소재 기반 ID에 매핑합니다.
@@ -680,11 +680,12 @@ def calculate_clothing_emission(item_type: str, count: int) -> float:
     Args:
         item_type: 아이템 종류 ("티셔츠", "청바지", "신발", "가방" 등)
         count: 개수
+        sub_category: 하위 카테고리 ("새제품", "빈티지"). 빈티지인 경우 새제품 배출량의 10% 적용
 
     Returns:
         탄소 배출량 (kgCO2e)
     """
-    logger.info(f"[의류 API] 계산 시작 - 종류: {item_type}, 개수: {count}")
+    logger.info(f"[의류 API] 계산 시작 - 종류: {item_type}, 개수: {count}, 하위 카테고리: {sub_category}")
 
     if not CLIMATIQ_API_KEY:
         logger.warning("[의류 API] CLIMATIQ_API_KEY가 설정되지 않았습니다. Fallback 사용")
@@ -731,7 +732,14 @@ def calculate_clothing_emission(item_type: str, count: int) -> float:
         fallback_factor = 12.0
         fallback_result = weight_kg * fallback_factor
         logger.info(f"[의류 API] Fallback 계산 결과: {fallback_result}kgCO2e")
-        return fallback_result
+        result = fallback_result
+
+    # 빈티지인 경우 새제품 배출량의 10% 적용
+    if sub_category == "빈티지":
+        result = result * 0.1
+        logger.info(f"[의류 API] 빈티지 적용: 새제품 배출량의 10% = {result}kgCO2e")
+    else:
+        logger.info(f"[의류 API] 새제품 배출량: {result}kgCO2e")
 
     return result
 
@@ -834,7 +842,8 @@ def calculate_carbon_with_api(
     value: float,
     unit: str,
     converted_value: float = None,
-    standard_unit: str = None
+    standard_unit: str = None,
+    sub_category: str = None
 ) -> Optional[float]:
     """
     API를 사용하여 탄소 배출량 계산 (카테고리별로 적절한 API 선택)
@@ -846,6 +855,7 @@ def calculate_carbon_with_api(
         unit: 원본 단위
         converted_value: 변환된 값 (표준 단위)
         standard_unit: 표준 단위
+        sub_category: 하위 카테고리 (의류: 새제품/빈티지)
     
     Returns:
         탄소 배출량 (kgCO2e) 또는 None (API 사용 불가 시)
@@ -853,6 +863,8 @@ def calculate_carbon_with_api(
     logger.info(f"[API 통합] 계산 요청 - 카테고리: {category}, 활동: {activity_type}, 값: {value}{unit}")
     if converted_value:
         logger.info(f"[API 통합] 변환된 값: {converted_value}{standard_unit}")
+    if sub_category:
+        logger.info(f"[API 통합] 하위 카테고리: {sub_category}")
     
     try:
         if category == "교통":
@@ -890,7 +902,7 @@ def calculate_carbon_with_api(
         elif category == "의류":
             logger.info(f"[API 통합] 의류 카테고리 처리 시작")
             item_count = converted_value if converted_value else value
-            result = calculate_clothing_emission(activity_type, int(item_count))
+            result = calculate_clothing_emission(activity_type, int(item_count), sub_category)
             logger.info(f"[API 통합] 의류 계산 완료: {result}kgCO2e")
             return result
 
