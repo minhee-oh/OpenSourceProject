@@ -457,6 +457,12 @@ class ChallengeState(MileageState):
             logger.error(f"챌린지 진행도 로드 오류: {e}", exc_info=True)
         
         try:
+            # 마일리지 환산 내역 로드
+            await self.load_mileage_conversion_logs()
+        except Exception as e:
+            logger.error(f"마일리지 환산 내역 로드 오류: {e}", exc_info=True)
+        
+        try:
             # 탄소 통계 로드 및 개별 변수에 할당
             stats = await self.get_carbon_statistics()
             self.carbon_total_logs = stats.get("total_logs", 0)

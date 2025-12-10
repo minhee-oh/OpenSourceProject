@@ -194,6 +194,143 @@ def mypage_page() -> rx.Component:
                         margin_bottom="30px",
                     ),
                     
+                    # 마일리지 환산 섹션
+                    rx.box(
+                        rx.vstack(
+                            rx.heading("💳 비컴 마일리지 환산", size="6", color="white", margin_bottom="20px"),
+                            rx.text(
+                                "포인트 100점당 비컴 마일리지 10점으로 환산됩니다.",
+                                color="gray.300",
+                                size="3",
+                                margin_bottom="15px",
+                            ),
+                            rx.text(
+                                "최소 100점 이상부터 환산 신청이 가능합니다.",
+                                color="gray.400",
+                                size="2",
+                                margin_bottom="20px",
+                            ),
+                            rx.hstack(
+                                rx.input(
+                                    placeholder="환산할 포인트 입력 (최소 100점)",
+                                    value=AppState.mileage_request_points,
+                                    on_change=AppState.set_mileage_request_points,
+                                    type="number",
+                                    min=100,
+                                    width="200px",
+                                    color="white",
+                                    border="1px solid rgba(255, 255, 255, 0.3)",
+                                ),
+                                rx.button(
+                                    "환산 신청",
+                                    on_click=AppState.request_mileage_conversion,
+                                    color_scheme="green",
+                                    size="3",
+                                    is_disabled=AppState.current_user_points < 100,
+                                ),
+                                spacing="3",
+                                align="center",
+                                width="100%",
+                                justify="center",
+                            ),
+                            rx.cond(
+                                AppState.mileage_error_message != "",
+                                rx.text(
+                                    AppState.mileage_error_message,
+                                    color="red.300",
+                                    size="3",
+                                    margin_top="10px",
+                                ),
+                                rx.text("", display="none"),
+                            ),
+                            rx.cond(
+                                AppState.mileage_request_points >= 100,
+                                rx.text(
+                                    f"환산 예상 마일리지: {(AppState.mileage_request_points // 100) * 10}점",
+                                    color="green.300",
+                                    size="3",
+                                    font_weight="bold",
+                                    margin_top="10px",
+                                ),
+                                rx.text("", display="none"),
+                            ),
+                            spacing="3",
+                        ),
+                        padding="30px",
+                        border_radius="16px",
+                        background="rgba(0, 0, 0, 0.3)",
+                        width="100%",
+                        max_width="600px",
+                        margin_bottom="30px",
+                    ),
+                    
+                    # 마일리지 환산 내역 섹션
+                    rx.box(
+                        rx.vstack(
+                            rx.heading("📋 마일리지 환산 내역", size="6", color="white", margin_bottom="20px"),
+                            rx.cond(
+                                AppState.mileage_conversion_logs.length() > 0,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.mileage_conversion_logs,
+                                        lambda log: rx.hstack(
+                                            rx.vstack(
+                                                rx.text(
+                                                    log["date"],
+                                                    color="white",
+                                                    size="3",
+                                                    font_weight="bold",
+                                                ),
+                                                rx.text(
+                                                    f"-{log['request_points']} 포인트 → +{log['converted_mileage']} 마일리지",
+                                                    color="green.300",
+                                                    size="4",
+                                                    font_weight="bold",
+                                                ),
+                                                spacing="1",
+                                                align="start",
+                                            ),
+                                            rx.cond(
+                                                log["status"] == "APPROVED",
+                                                rx.badge(
+                                                    "승인완료",
+                                                    color_scheme="green",
+                                                    size="2",
+                                                ),
+                                                rx.badge(
+                                                    log["status"],
+                                                    color_scheme="gray",
+                                                    size="2",
+                                                ),
+                                            ),
+                                            spacing="4",
+                                            justify="between",
+                                            width="100%",
+                                            padding="15px",
+                                            border_radius="8px",
+                                            background="rgba(255, 255, 255, 0.1)",
+                                            margin_bottom="8px",
+                                        ),
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                ),
+                                rx.text(
+                                    "아직 환산 내역이 없습니다.",
+                                    color="gray.400",
+                                    size="3",
+                                ),
+                            ),
+                            spacing="3",
+                        ),
+                        padding="30px",
+                        border_radius="16px",
+                        background="rgba(0, 0, 0, 0.3)",
+                        width="100%",
+                        max_width="600px",
+                        margin_bottom="30px",
+                    ),
+                    
                     # 챌린지 진행률 섹션
                     rx.box(
                         rx.vstack(
