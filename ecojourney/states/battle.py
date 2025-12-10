@@ -146,6 +146,18 @@ class BattleState(CarbonState):
                 
                 for p in participants:
                     user_college = self._get_user_college(p.student_id, session)
+                    # user_college가 None인 경우 처리 (사용자 조회 실패)
+                    if user_college is None:
+                        logger.warning(f"참가자 {p.student_id}의 단과대를 조회할 수 없습니다. 베팅 포인트를 반환합니다.")
+                        # 조회 실패한 참가자에게 베팅 포인트 반환
+                        p.reward_amount = p.bet_amount
+                        session.add(p)
+                        user = session.exec(select(User).where(User.student_id == p.student_id)).first()
+                        if user:
+                            user.current_points += p.bet_amount
+                            session.add(user)
+                        continue
+                    
                     if (battle.college_a == winner and user_college == battle.college_a) or \
                        (battle.college_b == winner and user_college == battle.college_b):
                         winner_participants.append(p)
