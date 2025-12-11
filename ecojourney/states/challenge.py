@@ -6,13 +6,13 @@ import reflex as rx
 from typing import List, Dict, Any
 from datetime import datetime, date, timedelta
 import logging
-from .battle import BattleState
+from .mileage import MileageState
 from ..models import Challenge, ChallengeProgress, User
 
 logger = logging.getLogger(__name__)
 
 
-class ChallengeState(BattleState):
+class ChallengeState(MileageState):
     """
     챌린지 시스템 관련 상태 및 로직
     """
@@ -45,7 +45,7 @@ class ChallengeState(BattleState):
 
             default_challenges = [
                 {"title": "7일 연속 기록", "type": "WEEKLY_STREAK", "goal_value": 7, "reward_points": 700},
-                {"title": "정보 글 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 150},
+                {"title": "아티클 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 150},
                 {"title": "OX 퀴즈 풀기", "type": "DAILY_QUIZ", "goal_value": 1, "reward_points": 200},
             ]
 
@@ -210,6 +210,26 @@ class ChallengeState(BattleState):
                         self.current_user_points = user.current_points
                         session.add(user)
 
+                        # 포인트 로그 기록
+                        from ..models import PointsLog
+
+                        # 챌린지 타입에 따라 출처 결정
+                        source_map = {
+                            "DAILY_QUIZ": "OX퀴즈",
+                            "DAILY_INFO": "아티클 읽기",
+                            "WEEKLY_STREAK": "7일 연속 기록"
+                        }
+                        source = source_map.get(challenge.type, "챌린지")
+
+                        points_log = PointsLog(
+                            student_id=self.current_user_id,
+                            log_date=date.today(),
+                            points=challenge.reward_points,
+                            source=source,
+                            description=challenge.title
+                        )
+                        session.add(points_log)
+
                     logger.info(f"챌린지 완료: {self.current_user_id}, 챌린지: {challenge.title}, 보상: {challenge.reward_points}")
 
                 # 진행도 저장 (세션 커밋)
@@ -305,7 +325,7 @@ class ChallengeState(BattleState):
                 return
             await self.update_challenge_progress(challenge["id"], 1)
             self.article_read_today = True  # 상태 업데이트
-            self.challenge_message = "정보 글 읽기 완료! 포인트가 적립됩니다."
+            self.challenge_message = "아티클 읽기 완료! 포인트가 적립됩니다."
             await self.load_user_challenge_progress()
         except Exception as e:
             self.challenge_message = f"정보 글 읽기 처리 중 오류: {e}"
@@ -374,41 +394,42 @@ class ChallengeState(BattleState):
         if not self.is_logged_in or not self.current_user_id:
             self.points_log = []
             return
-        
+
         try:
-            from ..models import CarbonLog
+            from ..models import PointsLog
             from sqlmodel import Session, create_engine, select
             import os
-            
+
             db_path = os.path.join(os.getcwd(), "reflex.db")
             db_url = f"sqlite:///{db_path}"
             engine = create_engine(db_url, echo=False)
-            
+
             with Session(engine) as session:
-                # 포인트가 0보다 큰 로그만 조회 (포인트가 있는 기록만 표시)
-                stmt = select(CarbonLog).where(
-                    CarbonLog.student_id == self.current_user_id,
-                    CarbonLog.points_earned > 0
-                ).order_by(CarbonLog.log_date.desc())
-                
-                logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                
+                # PointsLog 테이블에서 포인트 내역 조회
+                stmt = select(PointsLog).where(
+                    PointsLog.student_id == self.current_user_id
+                ).order_by(PointsLog.log_date.desc())
+
+                logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}")
+                print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}")
+
                 logs = session.exec(stmt).all()
                 print(f"[포인트 로그] 조회 결과: {len(logs)}개")
-                
+
                 result = []
                 for log in logs:
                     result.append({
                         "date": log.log_date.strftime("%Y-%m-%d") if log.log_date else "",
-                        "points": log.points_earned
+                        "points": log.points,
+                        "source": log.source,
+                        "description": log.description or ""
                     })
-                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점")
-                
+                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points}점, 출처: {log.source}")
+
                 self.points_log = result
                 logger.info(f"포인트 로그 로드 완료: {len(result)}개")
                 print(f"[포인트 로그] 최종 결과: {len(result)}개")
-                
+
         except Exception as e:
             logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
             self.points_log = []

@@ -1169,17 +1169,30 @@ class CarbonState(AuthState):
                     logger.info("[저장] 새 로그 생성")
                 
                 session.add(log)
-                
+
                 # 사용자 포인트 업데이트 (같은 세션에서)
                 if is_new_log:
                     # 새로운 로그: 포인트 추가
                     user.current_points += points_earned
                     logger.info(f"[저장] 새 로그 - 포인트 추가: {user.current_points - points_earned} + {points_earned} = {user.current_points}")
+
+                    # 포인트 로그 기록 (새 로그인 경우에만)
+                    if points_earned > 0:
+                        from ..models import PointsLog
+
+                        points_log = PointsLog(
+                            student_id=self.current_user_id,
+                            log_date=today,
+                            points=points_earned,
+                            source="리포트",
+                            description="활동 기록"
+                        )
+                        session.add(points_log)
                 else:
                     # 기존 로그 업데이트: 기존 포인트를 빼고 새 포인트 추가
                     user.current_points = user.current_points - old_points + points_earned
                     logger.info(f"[저장] 기존 로그 업데이트 - 포인트 조정: {user.current_points + old_points - points_earned} - {old_points} + {points_earned} = {user.current_points}")
-                
+
                 self.current_user_points = user.current_points
                 session.add(user)
                 

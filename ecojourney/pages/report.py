@@ -130,15 +130,17 @@ def report_page() -> rx.Component:
     최종 탄소 발자국 리포트 페이지 컴포넌트입니다.
     4분할 레이아웃: 막대그래프, 파이차트, 포인트 내역, AI 솔루션
     """
-    return rx.box(
-        rx.vstack(
-            # 헤더
-            header(),
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            rx.vstack(
+                # 헤더
+                header(),
 
-            # 메인 컨텐츠 - 4분할 그리드
-            rx.cond(
-                AppState.is_report_calculated,
-                rx.box(
+                # 메인 컨텐츠 - 4분할 그리드
+                rx.cond(
+                    AppState.is_report_calculated,
+                    rx.box(
                     rx.heading(
                         "Your Carbon Footprint Report",
                         size="9",
@@ -689,94 +691,98 @@ def report_page() -> rx.Component:
                     ),
                     padding="20px 40px",
                     width="100%",
-                ),
-                # 계산 중 로딩 상태
-                rx.box(
-                    rx.vstack(
-                        rx.spinner(size="3", color="#4DAB75"),
-                        rx.text("리포트를 생성하고 있습니다...", size="4", color="#333333", font_weight="600"),
-                        rx.text("잠시만 기다려주세요", size="2", color="#666666"),
-                        spacing="3",
-                        align="center",
-                        justify="center",
                     ),
-                    display="flex",
-                    align_items="center",
-                    justify_content="center",
-                    height="calc(100vh - 100px)",
-                    width="100%",
-                )
-            ),
+                    # 계산 중 로딩 상태
+                    rx.box(
+                        rx.vstack(
+                            rx.spinner(size="3", color="#4DAB75"),
+                            rx.text("리포트를 생성하고 있습니다...", size="4", color="#333333", font_weight="600"),
+                            rx.text("잠시만 기다려주세요", size="2", color="#666666"),
+                            spacing="3",
+                            align="center",
+                            justify="center",
+                        ),
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                        height="calc(100vh - 100px)",
+                        width="100%",
+                    )
+                ),
 
-            # 하단 버튼
-            rx.hstack(
-                rx.cond(
-                    AppState.is_logged_in,
+                # 하단 버튼
+                rx.hstack(
                     rx.cond(
-                        AppState.is_saving,
-                        rx.button(
-                            "저장 중...",
-                            is_disabled=True,
-                            size="2",
-                            background_color="rgba(217, 239, 222, 0.3)",
-                            color="rgba(217, 239, 222, 0.5)",
-                        ),
-                        rx.button(
-                            "저장하기",
-                            on_click=AppState.save_carbon_log_to_db,
-                            size="2",
-                            is_disabled=~AppState.is_report_calculated,
-                            background_color="#4DAB75",
-                            color="#FFFFFF",
-                            border_radius="25px",
-                            padding="10px 28px",
-                            font_weight="600",
-                            cursor="pointer",
-                            _hover={
-                                "background_color": "#3d9a66",
-                            },
+                        AppState.is_logged_in,
+                        rx.cond(
+                            AppState.is_saving,
+                            rx.button(
+                                "저장 중...",
+                                is_disabled=True,
+                                size="2",
+                                background_color="rgba(217, 239, 222, 0.3)",
+                                color="rgba(217, 239, 222, 0.5)",
+                            ),
+                            rx.button(
+                                "저장하기",
+                                on_click=AppState.save_carbon_log_to_db,
+                                size="2",
+                                is_disabled=~AppState.is_report_calculated,
+                                background_color="#4DAB75",
+                                color="#FFFFFF",
+                                border_radius="25px",
+                                padding="10px 28px",
+                                font_weight="600",
+                                cursor="pointer",
+                                _hover={
+                                    "background_color": "#3d9a66",
+                                },
+                            ),
                         ),
                     ),
-                ),
-                rx.button(
-                    "처음으로",
-                    on_click=rx.redirect("/intro"),
-                    size="2",
-                    background_color="transparent",
-                    color="#4DAB75",
-                    border="1px solid rgba(77, 171, 117, 0.3)",
-                    border_radius="25px",
-                    padding="10px 28px",
-                    font_weight="600",
-                    cursor="pointer",
-                    _hover={
-                        "background_color": "rgba(77, 171, 117, 0.05)",
-                        "border": "1px solid #4DAB75",
-                    },
-                ),
-                rx.cond(
-                    AppState.save_message != "",
-                    rx.text(
-                        AppState.save_message,
+                    rx.button(
+                        "처음으로",
+                        on_click=rx.redirect("/intro"),
                         size="2",
-                        color=rx.cond(AppState.is_save_success, "#6ee7b7", "#fca5a5"),
-                        font_weight="500",
+                        background_color="transparent",
+                        color="#4DAB75",
+                        border="1px solid rgba(77, 171, 117, 0.3)",
+                        border_radius="25px",
+                        padding="10px 28px",
+                        font_weight="600",
+                        cursor="pointer",
+                        _hover={
+                            "background_color": "rgba(77, 171, 117, 0.05)",
+                            "border": "1px solid #4DAB75",
+                        },
                     ),
+                    rx.cond(
+                        AppState.save_message != "",
+                        rx.text(
+                            AppState.save_message,
+                            size="2",
+                            color=rx.cond(AppState.is_save_success, "#6ee7b7", "#fca5a5"),
+                            font_weight="500",
+                        ),
+                    ),
+                    spacing="3",
+                    padding="20px 40px",
+                    justify="center",
+                    width="100%",
+                    background_color="#FFFFFF",
+                    border_top="1px solid #E0E0E0",
                 ),
-                spacing="3",
-                padding="20px 40px",
-                justify="center",
-                width="100%",
-                background_color="#FFFFFF",
-                border_top="1px solid #E0E0E0",
-            ),
 
-            spacing="0",
-            width="100%",
-            min_height="100vh",
-        ),
+                spacing="0",
+                width="100%",
+                min_height="100vh",
+            ),
         background="#F8F9FA",
         width="100%",
         min_height="100vh",
         on_mount=AppState.on_report_page_load,  # 페이지 로드 시 자동 실행
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
+        ),
     )

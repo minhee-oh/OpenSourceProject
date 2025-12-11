@@ -237,9 +237,11 @@ def clothing_input_field(label: str, value_name: str, unit_name: str, sub_name: 
 # =======================================================
 
 def clothing_page():
-    return rx.box(
-        header(),
-        rx.container(
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            header(),
+            rx.container(
             rx.vstack(
                 rx.heading(
                     "Your Clothing Choices",
@@ -413,4 +415,8 @@ def clothing_page():
         ),
         min_height="100vh",
         background="#F8F9FA",
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
+        ),
     )

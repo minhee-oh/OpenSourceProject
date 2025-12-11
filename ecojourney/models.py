@@ -149,8 +149,22 @@ class ChallengeProgress(rx.Model, table=True):
     """
     challenge_id: int
     student_id: str
-    
+
     current_value: int = 0     # 현재 달성치
     is_completed: bool = False # 보상 지급 여부
     completed_at: Optional[datetime] = None  # 완료 시점
     last_updated: datetime = datetime.now()
+
+# -----------------------------------------------------------------------------
+# 6. 포인트 로그 (Points Log)
+# -----------------------------------------------------------------------------
+class PointsLog(rx.Model, table=True):
+    """
+    포인트 획득 내역을 기록하는 테이블
+    """
+    student_id: str  # User 테이블 참조
+    log_date: date = date.today()
+    points: int = 0  # 획득한 포인트
+    source: str  # 포인트 출처: "리포트", "OX퀴즈", "아티클 읽기", "챌린지" 등
+    description: Optional[str] = None  # 추가 설명 (선택사항)
+    created_at: datetime = datetime.now()

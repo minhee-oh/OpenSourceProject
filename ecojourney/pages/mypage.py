@@ -2,6 +2,28 @@
 
 import reflex as rx
 from ecojourney.state import AppState
+import json
+
+# fade-in 애니메이션 CSS
+FADEIN_STYLE = {
+    "opacity": 0,
+    "animation": "fadeIn 0.6s ease forwards",
+}
+
+FADEIN_CSS = """
+<style>
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+"""
 
 # -----------------------------------------
 # 공통 헤더
@@ -133,70 +155,74 @@ def header() -> rx.Component:
 # ① 내 포인트 섹션
 # -----------------------------------------
 def render_points_section():
-    return rx.vstack(
-        rx.heading("내 포인트", size="8", color="#333333"),
+    return rx.box(
+        rx.vstack(
+            rx.heading("내 포인트", size="8", color="#333333"),
 
-        rx.box(
-            rx.vstack(
-                rx.heading("현재 보유 포인트", size="6", color="#333333"),
-                rx.text(
-                    f"{AppState.current_user_points:,}점",
-                    size="9",
-                    color="yellow.300",
-                    font_weight="bold",
-                ),
-                rx.text(
-                    f"단과대: {AppState.current_user_college}",
-                    size="3",
-                    color="gray.300",
-                ),
-                spacing="2",
-                align="center",
-            ),
-            padding="30px",
-            border_radius="16px",
-            background="#F1F3F4",
-            width="100%",
-            max_width="600px",
-        ),
-
-        rx.divider(),
-
-        rx.heading("포인트 획득 내역", size="6", color="#333333"),
-
-        rx.box(
-            rx.cond(
-                AppState.points_log.length() > 0,
+            rx.box(
                 rx.vstack(
-                    rx.foreach(
-                        AppState.points_log,
-                        lambda log: rx.hstack(
-                            rx.text(log["date"], color="#555", size="4", width="150px"),
-                            rx.text(
-                                f"+{log['points']} 포인트",
-                                color="#4DAB75",
-                                size="4",
-                                font_weight="bold",
-                            ),
-                            justify="between",
-                            width="100%",
-                            padding="12px",
-                            border_radius="8px",
-                            background="#F1F3F4",
-                            margin_bottom="6px",
-                        ),
+                    rx.heading("현재 보유 포인트", size="6", color="#333333"),
+                    rx.text(
+                        f"{AppState.current_user_points:,}점",
+                        size="9",
+                        color="yellow.300",
+                        font_weight="bold",
+                    ),
+                    rx.text(
+                        f"단과대: {AppState.current_user_college}",
+                        size="3",
+                        color="gray.300",
                     ),
                     spacing="2",
+                    align="center",
                 ),
-                rx.text("포인트 내역이 없습니다.", color="gray"),
+                padding="30px",
+                border_radius="16px",
+                background="#F1F3F4",
+                width="100%",
+                max_width="600px",
             ),
-            width="100%",
-            max_width="600px",
-        ),
 
-        spacing="5",
-        width="100%",
-        align="center",
+            rx.divider(),
+
+            rx.heading("포인트 획득 내역", size="6", color="#333333"),
+
+            rx.box(
+                rx.cond(
+                    AppState.points_log.length() > 0,
+                    rx.vstack(
+                        rx.foreach(
+                            AppState.points_log,
+                            lambda log: rx.hstack(
+                                rx.text(log["source"], color="#333333", size="2", margin_top="3px", font_weight="bold"),
+                                rx.text(
+                                    f"+{log['points']} 포인트",
+                                    color="#4DAB75",
+                                    size="4",
+                                    font_weight="bold",
+                                ),
+                                rx.text(log["date"], color="#555", size="3"),
+                                justify="between",
+                                width="100%",
+                                padding="12px",
+                                border_radius="8px",
+                                background="#F1F3F4",
+                                margin_bottom="6px",
+                            ),
+                        ),
+                        spacing="2",
+                    ),
+                    rx.text("포인트 내역이 없습니다.", color="gray"),
+                ),
+                width="100%",
+                max_width="600px",
+            ),
+
+            spacing="5",
+            width="100%",
+            align="center",
+        ),
+        style=FADEIN_STYLE,
     )
 
 
@@ -204,60 +230,63 @@ def render_points_section():
 # ② 챌린지 현황 섹션
 # -----------------------------------------
 def render_challenge_section():
-    return rx.vstack(
-        rx.heading("챌린지 현황", size="8", color="#333333"),
+    return rx.box(
+        rx.vstack(
+            rx.heading("챌린지 현황", size="8", color="#333333"),
 
-        rx.cond(
-            AppState.user_challenge_progress.length() > 0,
-            rx.vstack(
-                rx.foreach(
-                    AppState.user_challenge_progress,
-                    lambda progress: rx.box(
-                        rx.vstack(
-                            rx.hstack(
-                                rx.text(progress["title"], size="4", font_weight="bold"),
-                                rx.cond(
-                                    progress["is_completed"],
-                                    rx.badge("완료", color_scheme="green"),
-                                    rx.badge("진행중", color_scheme="blue"),
+            rx.cond(
+                AppState.user_challenge_progress.length() > 0,
+                rx.vstack(
+                    rx.foreach(
+                        AppState.user_challenge_progress,
+                        lambda progress: rx.box(
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.text(progress["title"], size="4", font_weight="bold"),
+                                    rx.cond(
+                                        progress["is_completed"],
+                                        rx.badge("완료", color_scheme="green"),
+                                        rx.badge("진행중", color_scheme="blue"),
+                                    ),
+                                    justify="between",
+                                    width="100%",
                                 ),
-                                justify="between",
-                                width="100%",
+                                rx.text(
+                                    f"{progress['current_value']} / {progress['goal_value']}",
+                                    color="#777",
+                                    size="3",
+                                ),
+                                rx.progress(
+                                    value=progress["progress_percent"],
+                                    width="100%",
+                                    color_scheme="green",
+                                ),
+                                rx.text(
+                                    f"보상: {progress['reward_points']}점",
+                                    color="#777",
+                                    size="2",
+                                ),
+                                spacing="2",
                             ),
-                            rx.text(
-                                f"{progress['current_value']} / {progress['goal_value']}",
-                                color="#777",
-                                size="3",
-                            ),
-                            rx.progress(
-                                value=progress["progress_percent"],
-                                width="100%",
-                                color_scheme="green",
-                            ),
-                            rx.text(
-                                f"보상: {progress['reward_points']}점",
-                                color="#777",
-                                size="2",
-                            ),
-                            spacing="2",
+                            padding="20px",
+                            background="#F1F3F4",
+                            border_radius="12px",
+                            width="100%",
+                            max_width="700px",
+                            margin_bottom="12px",
                         ),
-                        padding="20px",
-                        background="#F1F3F4",
-                        border_radius="12px",
-                        width="100%",
-                        max_width="700px",
-                        margin_bottom="12px",
                     ),
+                    align="center",
+                    width="100%",
                 ),
-                align="center",
-                width="100%",
+                rx.text("참여 중인 챌린지가 없습니다.", color="gray"),
             ),
-            rx.text("참여 중인 챌린지가 없습니다.", color="gray"),
-        ),
 
-        spacing="4",
-        width="100%",
-        align="center",
+            spacing="4",
+            width="100%",
+            align="center",
+        ),
+        style=FADEIN_STYLE,
     )
 
 
@@ -265,12 +294,13 @@ def render_challenge_section():
 # ③ 탄소 배출 대시보드 섹션
 # -----------------------------------------
 def render_dashboard_section():
-    return rx.vstack(
-        rx.heading("탄소 배출 대시보드", size="8", color="#333333"),
+    return rx.box(
+        rx.vstack(
+            rx.heading("탄소 배출 대시보드", size="8", color="#333333"),
 
-        rx.cond(
-            AppState.carbon_total_logs > 0,
-            rx.vstack(
+            rx.cond(
+                AppState.carbon_total_logs > 0,
+                rx.vstack(
                 # 요약 카드
                 rx.box(
                     rx.hstack(
@@ -423,29 +453,39 @@ def render_dashboard_section():
                             ),
                             rx.box(
                                 # SVG로 꺾은선 그래프 그리기
-                                rx.html(
-                                    f"""
-                                    <svg width="100%" height="250" style="overflow: visible;">
-                                        <!-- 그리드 라인 -->
-                                        <line x1="0" y1="200" x2="100%" y2="200" stroke="#E0E0E0" stroke-width="1"/>
-                                        <line x1="0" y1="150" x2="100%" y2="150" stroke="#E0E0E0" stroke-width="1"/>
-                                        <line x1="0" y1="100" x2="100%" y2="100" stroke="#E0E0E0" stroke-width="1"/>
-                                        <line x1="0" y1="50" x2="100%" y2="50" stroke="#E0E0E0" stroke-width="1"/>
+                                rx.cond(
+                                    AppState.monthly_daily_data.length() > 0,
+                                    rx.box(
+                                        rx.html(
+                                            """
+                                            <svg width="100%" height="250" style="overflow: visible;" id="monthly-chart-svg">
+                                                <!-- 그리드 라인 -->
+                                                <line x1="0" y1="200" x2="100%" y2="200" stroke="#E0E0E0" stroke-width="1"/>
+                                                <line x1="0" y1="150" x2="100%" y2="150" stroke="#E0E0E0" stroke-width="1"/>
+                                                <line x1="0" y1="100" x2="100%" y2="100" stroke="#E0E0E0" stroke-width="1"/>
+                                                <line x1="0" y1="50" x2="100%" y2="50" stroke="#E0E0E0" stroke-width="1"/>
 
-                                        <!-- 꺾은선 경로 -->
-                                        <polyline id="emission-line" fill="none" stroke="#4DAB75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                <!-- 꺾은선 경로 -->
+                                                <polyline id="emission-line" fill="none" stroke="#4DAB75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-                                        <!-- 데이터 포인트들 -->
-                                        <g id="data-points"></g>
-                                    </svg>
-                                    <script>
-                                        (function() {{
-                                            const data = {rx.Var.create(AppState.monthly_daily_data)};
-                                            const svg = document.querySelector('#emission-line').closest('svg');
-                                            const line = document.querySelector('#emission-line');
-                                            const pointsGroup = document.querySelector('#data-points');
+                                                <!-- 데이터 포인트들 -->
+                                                <g id="data-points"></g>
+                                            </svg>
+                                            """
+                                        ),
+                                        rx.script(
+                                            """
+                                            // 30일 그래프 렌더링을 위해 데이터를 기다립니다
+                                            setTimeout(function() {
+                                                const dataElement = document.getElementById('monthly-data-json');
+                                                if (!dataElement) return;
 
-                                            if (!data || data.length === 0) return;
+                                                const data = JSON.parse(dataElement.textContent);
+                                                const svg = document.getElementById('monthly-chart-svg');
+                                                const line = document.getElementById('emission-line');
+                                                const pointsGroup = document.getElementById('data-points');
+
+                                                if (!data || data.length === 0) return;
 
                                             const svgWidth = svg.clientWidth;
                                             const spacing = svgWidth / (data.length + 1);
@@ -547,9 +587,15 @@ def render_dashboard_section():
                                                     svg.appendChild(dateLabel);
                                                 }}
                                             }});
-                                        }})();
-                                    </script>
-                                    """
+                                        }, 100);
+                                        """
+                                        ),
+                                        # 데이터를 JSON으로 숨겨서 전달
+                                        rx.html(
+                                            f"""<script type="application/json" id="monthly-data-json">{AppState.monthly_daily_data}</script>"""
+                                        ),
+                                    ),
+                                    rx.text("데이터가 없습니다.", color="gray.400", size="3"),
                                 ),
                                 width="100%",
                                 min_height="250px",
@@ -572,20 +618,121 @@ def render_dashboard_section():
             rx.text("기록된 배출 데이터가 없습니다.", color="gray"),
         ),
 
-        spacing="5",
-        width="100%",
-        align="center",
+            spacing="5",
+            width="100%",
+            align="center",
+        ),
+        style=FADEIN_STYLE,
     )
 
 
+# -----------------------------------------
+# ④ 마일리지 환산 섹션
+# -----------------------------------------
+def render_mileage_section():
+    return rx.box(
+        rx.vstack(
+            rx.heading("마일리지 환산", size="8", color="#333333"),
+
+            rx.box(
+                rx.vstack(
+                    rx.heading("포인트 → 마일리지 환산", size="6", color="#333333"),
+                    rx.text(
+                        "앱 내 포인트를 학교 BeCome 마일리지로 환산할 수 있습니다.",
+                        color="#777",
+                        size="3",
+                        margin_bottom="10px",
+                    ),
+                    rx.text(
+                        f"현재 보유 포인트: {AppState.current_user_points:,}점",
+                        color="#4DAB75",
+                        size="4",
+                        font_weight="bold",
+                        margin_bottom="20px",
+                    ),
+
+                    rx.hstack(
+                        rx.input(
+                            placeholder="환산할 포인트 입력",
+                            type="number",
+                            value=AppState.mileage_request_points,
+                            on_change=AppState.set_mileage_points,
+                            width="200px",
+                        ),
+                        rx.button(
+                            "환산 신청",
+                            on_click=AppState.request_mileage_conversion,
+                            background_color="#4DAB75",
+                            color="white",
+                            padding="10px 20px",
+                            border_radius="8px",
+                            _hover={"background_color": "#3d8f5f"},
+                        ),
+                        spacing="3",
+                        align="center",
+                    ),
+
+                    rx.cond(
+                        AppState.mileage_error_message != "",
+                        rx.box(
+                            rx.text(
+                                AppState.mileage_error_message,
+                                color=rx.cond(
+                                    AppState.mileage_error_message.contains("✅"),
+                                    "#4DAB75",
+                                    "red"
+                                ),
+                                size="3",
+                                font_weight="500",
+                            ),
+                            padding="10px",
+                            border_radius="8px",
+                            background=rx.cond(
+                                AppState.mileage_error_message.contains("✅"),
+                                "rgba(77, 171, 117, 0.1)",
+                                "rgba(255, 0, 0, 0.1)"
+                            ),
+                            margin_top="10px",
+                        ),
+                    ),
+
+                    spacing="3",
+                    align="start",
+                ),
+                padding="30px",
+                border_radius="16px",
+                background="#F1F3F4",
+                width="100%",
+                max_width="600px",
+            ),
+
+            rx.divider(),
+
+            rx.text(
+                "환산 비율: 100 포인트 = 1 마일리지",
+                color="#777",
+                size="2",
+            ),
+
+            spacing="5",
+            width="100%",
+            align="center",
+        ),
+        style=FADEIN_STYLE,
+    )
 
 
 # -----------------------------------------
 # 메인 페이지 구조 (사이드바 + 컨텐츠)
 # -----------------------------------------
 def mypage_page() -> rx.Component:
-    return rx.box(
-        header(),
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            # fade-in CSS 추가
+            rx.html(FADEIN_CSS),
+
+            header(),
 
         rx.hstack(
             # ----------- 왼쪽 사이드바 -----------
@@ -595,13 +742,12 @@ def mypage_page() -> rx.Component:
                         "내 포인트",
                         on_click=lambda: AppState.set_mypage_section("points"),
                         size="3",
+                        font_weight="bold",
                         background=rx.cond(AppState.mypage_section == "points", "#F1F3F4", "transparent"),
-                        color="#333333",
+                        color=rx.cond(AppState.mypage_section == "points", "#333333", "white"),
                         width="100%",
                         border_radius="10px",
                         padding="12px",
-
-                        # 텍스트 왼쪽 정렬
                         justify_content="start",
                         text_align="left",
                     ),
@@ -609,13 +755,12 @@ def mypage_page() -> rx.Component:
                         "챌린지 현황",
                         on_click=lambda: AppState.set_mypage_section("challenge"),
                         size="3",
+                        font_weight="bold",
                         background=rx.cond(AppState.mypage_section == "challenge", "#F1F3F4", "transparent"),
-                        color="#333333",
+                        color=rx.cond(AppState.mypage_section == "challenge", "#333333", "white"),
                         width="100%",
                         border_radius="10px",
                         padding="12px",
-
-                        # 텍스트 왼쪽 정렬
                         justify_content="start",
                         text_align="left",
                     ),
@@ -623,13 +768,25 @@ def mypage_page() -> rx.Component:
                         "탄소 배출 대시보드",
                         on_click=lambda: AppState.set_mypage_section("dashboard"),
                         size="3",
+                        font_weight="bold",
                         background=rx.cond(AppState.mypage_section == "dashboard", "#F1F3F4", "transparent"),
-                        color="#333333",
+                        color=rx.cond(AppState.mypage_section == "dashboard", "#333333", "white"),
                         width="100%",
                         border_radius="10px",
                         padding="12px",
-
-                        # 텍스트 왼쪽 정렬
+                        justify_content="start",
+                        text_align="left",
+                    ),
+                    rx.button(
+                        "마일리지 환산",
+                        on_click=lambda: AppState.set_mypage_section("mileage"),
+                        size="3",
+                        font_weight="bold",
+                        background=rx.cond(AppState.mypage_section == "mileage", "#F1F3F4", "transparent"),
+                        color=rx.cond(AppState.mypage_section == "mileage", "#333333", "white"),
+                        width="100%",
+                        border_radius="10px",
+                        padding="12px",
                         justify_content="start",
                         text_align="left",
                     ),
@@ -652,7 +809,11 @@ def mypage_page() -> rx.Component:
                     rx.cond(
                         AppState.mypage_section == "challenge",
                         render_challenge_section(),
-                        render_dashboard_section(),
+                        rx.cond(
+                            AppState.mypage_section == "dashboard",
+                            render_dashboard_section(),
+                            render_mileage_section(),
+                        ),
                     ),
                 ),
                 width="100%",
@@ -664,4 +825,9 @@ def mypage_page() -> rx.Component:
 
         background="#F8F9FA",
         min_height="100vh",
+        on_mount=lambda: [AppState.set_mypage_section("points"), AppState.load_mypage_data()],
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
+        ),
     )

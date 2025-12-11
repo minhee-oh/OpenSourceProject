@@ -21,6 +21,30 @@ ARTICLES = [
         "image": "/static/images/article2.jpg",
         "on_read": AppState.complete_daily_info,
     },
+    {
+        "title": "플라스틱 줄이기",
+        "summary": "일상 속 작은 실천으로 큰 변화를 만들 수 있습니다.",
+        "full_text": (
+            "플라스틱은 생분해되기까지 수백 년이 걸리며, 지구 곳곳에서 환경오염을 유발합니다.\n\n"
+            "텀블러 사용, 장바구니 지참, 일회용품 거절 같은 작은 행동들이 플라스틱 사용을 "
+            "크게 줄일 수 있습니다.\n\n"
+            "개인의 행동이 모이면 환경 보호에 큰 힘이 됩니다."
+        ),
+        "image": "/static/images/article3.jpg",
+        "on_read": AppState.complete_daily_info,
+    },
+    {
+        "title": "대중교통 이용의 중요성",
+        "summary": "차량 대신 대중교통을 이용하면 탄소 배출을 크게 줄일 수 있습니다.",
+        "full_text": (
+            "승용차 1km 운행 시 발생하는 탄소 배출량은 버스보다 약 5배 높습니다.\n\n"
+            "대중교통 이용은 도시의 교통 혼잡을 줄이고, 에너지 소비량을 줄이며, "
+            "온실가스 감축에 크게 기여합니다.\n\n"
+            "가능하다면 도보, 자전거, 버스·지하철을 적극 활용해보세요!"
+        ),
+        "image": "/static/images/article4.jpg",
+        "on_read": AppState.complete_daily_info,
+    },
 ]
 
 
@@ -336,10 +360,12 @@ def quiz_card():
 
 
 def info_page() -> rx.Component:
-    return rx.box(
-        header(),
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            header(),
 
-        # fade-in 애니메이션을 위한 CSS 삽입
+            # fade-in 애니메이션을 위한 CSS 삽입
         rx.html("""
         <style>
         @keyframes fadeInUp {
@@ -457,7 +483,7 @@ def info_page() -> rx.Component:
                     rx.box(
                         rx.image(
                             src="/challenge.png",    # assets/challenge.png
-                            width="70%",             # 이미지 너비
+                            width="100%",             # 이미지 너비
                             height="auto",
                             object_fit="contain",
                             style={
@@ -563,6 +589,10 @@ def info_page() -> rx.Component:
 
         ),
 
-        # 페이지 로드 시 퀴즈 상태 로드
-        on_mount=AppState.load_quiz_state,
+            # 페이지 로드 시 퀴즈 상태 로드
+            on_mount=AppState.load_quiz_state,
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
+        ),
     )

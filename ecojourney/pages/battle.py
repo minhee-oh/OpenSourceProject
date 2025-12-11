@@ -129,8 +129,10 @@ def header() -> rx.Component:
 
 def battle_page() -> rx.Component:
     """단과대별 대결 페이지"""
-    return rx.box(
-        header(),
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            header(),
 
         # fade-in 애니메이션을 위한 CSS 삽입
         rx.html("""
@@ -196,7 +198,7 @@ def battle_page() -> rx.Component:
                     rx.box(
                         rx.image(
                             src="/battle.png",
-                            width="50%",             # 이미지 너비
+                            width="100%",             # 이미지 너비
                             height="auto",
                             object_fit="contain",
                             style={
@@ -419,6 +421,10 @@ def battle_page() -> rx.Component:
                 justify_content="center",
                 margin_top="70vh",
             ),
+        ),
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
         ),
     )
 

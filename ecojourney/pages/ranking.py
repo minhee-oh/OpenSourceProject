@@ -129,8 +129,10 @@ def header() -> rx.Component:
 
 def ranking_page() -> rx.Component:
     """저번주 대결 결과 랭킹 페이지"""
-    return rx.box(
-        header(),
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            header(),
 
         # fade-in 애니메이션을 위한 CSS 삽입
         rx.html("""
@@ -196,7 +198,7 @@ def ranking_page() -> rx.Component:
                     rx.box(
                         rx.image(
                             src="/ranking.png",
-                            width="50%",             # 이미지 너비
+                            width="100%",             # 이미지 너비
                             height="auto",
                             object_fit="contain",
                             style={
@@ -420,6 +422,10 @@ def ranking_page() -> rx.Component:
                 justify_content="center",
                 margin_top="70vh",
             ),
+        ),
+        ),
+        rx.box(
+            on_mount=rx.redirect("/auth"),
         ),
     )
 
