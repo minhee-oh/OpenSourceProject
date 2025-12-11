@@ -7,6 +7,7 @@ from ..state import AppState
 def header() -> rx.Component:
     return rx.box(
         rx.hstack(
+            # 로고 버튼
             rx.button(
                 "ECOJOURNEY",
                 on_click=rx.redirect("/"),
@@ -19,6 +20,8 @@ def header() -> rx.Component:
                 border_radius="8px",
                 cursor="pointer",
             ),
+
+            # 로그인 상태에 따른 메뉴
             rx.cond(
                 AppState.is_logged_in,
                 rx.hstack(
@@ -31,9 +34,7 @@ def header() -> rx.Component:
                         border_radius="25px",
                         padding="8px 20px",
                         font_weight="500",
-                        _hover={
-                            "border": "1px solid #FFFFFF",
-                        },
+                        _hover={"border": "1px solid #FFFFFF"},
                     ),
                     rx.button(
                         "배틀",
@@ -44,9 +45,7 @@ def header() -> rx.Component:
                         border_radius="25px",
                         padding="8px 20px",
                         font_weight="500",
-                        _hover={
-                            "border": "1px solid #FFFFFF",
-                        },
+                        _hover={"border": "1px solid #FFFFFF"},
                     ),
                     rx.button(
                         "랭킹",
@@ -57,9 +56,23 @@ def header() -> rx.Component:
                         border_radius="25px",
                         padding="8px 20px",
                         font_weight="500",
-                        _hover={
-                            "border": "1px solid #FFFFFF",
-                        },
+                        _hover={"border": "1px solid #FFFFFF"},
+                    ),
+                    rx.button(
+                        "리포트",
+                        on_click=rx.redirect("/intro"),
+                        background_color="transparent",
+                        color="#FFFFFF",
+                        border="1px solid #FFFFFF",
+                        border_radius="25px",
+                        padding="8px 20px",
+                        font_weight="500",
+                    ),
+                    rx.text(
+                        f"{AppState.current_user_id}님",
+                        color="#FFFFFF",
+                        font_size="1em",
+                        margin_right="10px",
                     ),
                     rx.button(
                         "마이페이지",
@@ -74,12 +87,6 @@ def header() -> rx.Component:
                             "border": "1px solid #FFFFFF",
                         },
                     ),
-                    rx.text(
-                        f"{AppState.current_user_id}님",
-                        color="#FFFFFF",
-                        font_size="1em",
-                        margin_right="10px",
-                    ),
                     rx.button(
                         "로그아웃",
                         on_click=AppState.logout,
@@ -89,13 +96,13 @@ def header() -> rx.Component:
                         border_radius="25px",
                         padding="8px 20px",
                         font_weight="500",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.9)",
-                        },
+                        _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
                     ),
                     spacing="3",
                     align="center",
                 ),
+
+                # 로그인 안 된 상태 → 로그인 버튼
                 rx.button(
                     "로그인",
                     on_click=rx.redirect("/auth"),
@@ -105,15 +112,15 @@ def header() -> rx.Component:
                     border_radius="25px",
                     padding="8px 20px",
                     font_weight="500",
-                    _hover={
-                        "background_color": "rgba(255, 255, 255, 0.9)",
-                    },
+                    _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
                 ),
             ),
+
             justify="between",
             align="center",
             padding="1.5em 3em",
         ),
+
         width="100%",
         position="relative",
         z_index="10",

@@ -289,6 +289,12 @@ class ChallengeState(BattleState):
         if not self.is_logged_in:
             self.challenge_message = "로그인 후 이용해주세요."
             return
+
+        # 이미 오늘 읽었으면 무시
+        if self.article_read_today:
+            self.challenge_message = "오늘 이미 아티클을 읽었습니다. 내일 다시 도전해주세요!"
+            return
+
         self.challenge_message = ""
         try:
             await self.ensure_default_challenges()
@@ -298,6 +304,7 @@ class ChallengeState(BattleState):
                 self.challenge_message = "챌린지를 불러올 수 없습니다."
                 return
             await self.update_challenge_progress(challenge["id"], 1)
+            self.article_read_today = True  # 상태 업데이트
             self.challenge_message = "정보 글 읽기 완료! 포인트가 적립됩니다."
             await self.load_user_challenge_progress()
         except Exception as e:
@@ -318,7 +325,7 @@ class ChallengeState(BattleState):
                 self.challenge_message = "챌린지를 불러올 수 없습니다."
                 return
             await self.update_challenge_progress(challenge["id"], 1)
-            self.challenge_message = "OX 퀴즈 완료! 포인트가 적립됩니다."
+            self.challenge_message = "정답입니다! OX 퀴즈 완료! 포인트가 적립되었습니다."
             await self.load_user_challenge_progress()
         except Exception as e:
             self.challenge_message = f"OX 퀴즈 처리 중 오류: {e}"
@@ -610,5 +617,122 @@ class ChallengeState(BattleState):
             self.weekly_daily_data = []
             self.monthly_daily_data = []
 
+    mypage_section: str = "points"  # 기본값은 "내 포인트"
 
+    def set_mypage_section(self, section: str):
+        self.mypage_section = section
+
+    article_modal_open: bool = False
+    article_detail: dict = {}
+
+    # 퀴즈 상태 변수
+    quiz_answered: bool = False  # 오늘 퀴즈를 풀었는지 여부
+    quiz_is_correct: bool = False  # 정답 여부
+
+    # 아티클 상태 변수
+    article_read_today: bool = False  # 오늘 아티클을 읽었는지 여부
+
+    def open_article(self, article: dict):
+        self.article_detail = article
+        self.article_modal_open = True
+
+    def close_article(self):
+        self.article_modal_open = False
+
+    async def load_quiz_state(self):
+        """퀴즈 및 아티클 상태 로드 (오늘 이미 완료했는지 확인)"""
+        if not self.is_logged_in or not self.current_user_id:
+            self.quiz_answered = False
+            self.quiz_is_correct = False
+            self.article_read_today = False
+            return
+
+        try:
+            from sqlmodel import Session, create_engine, select
+            import os
+
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+
+            today = date.today()
+
+            # 챌린지 로드
+            await self.ensure_default_challenges()
+            await self.load_active_challenges()
+
+            quiz_challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_QUIZ"), None)
+            info_challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_INFO"), None)
+
+            with Session(engine) as session:
+                # DAILY_QUIZ 진행도 조회
+                if quiz_challenge:
+                    quiz_progress = session.exec(
+                        select(ChallengeProgress).where(
+                            ChallengeProgress.challenge_id == quiz_challenge["id"],
+                            ChallengeProgress.student_id == self.current_user_id
+                        )
+                    ).first()
+
+                    if quiz_progress and quiz_progress.last_updated:
+                        last_updated_date = quiz_progress.last_updated.date()
+                        if last_updated_date == today:
+                            self.quiz_answered = True
+                            self.quiz_is_correct = quiz_progress.is_completed
+                            logger.info(f"퀴즈 상태 로드: 오늘 풀었음 (정답: {self.quiz_is_correct})")
+                        else:
+                            self.quiz_answered = False
+                            self.quiz_is_correct = False
+                    else:
+                        self.quiz_answered = False
+                        self.quiz_is_correct = False
+                else:
+                    self.quiz_answered = False
+                    self.quiz_is_correct = False
+
+                # DAILY_INFO 진행도 조회
+                if info_challenge:
+                    info_progress = session.exec(
+                        select(ChallengeProgress).where(
+                            ChallengeProgress.challenge_id == info_challenge["id"],
+                            ChallengeProgress.student_id == self.current_user_id
+                        )
+                    ).first()
+
+                    if info_progress and info_progress.last_updated:
+                        last_updated_date = info_progress.last_updated.date()
+                        if last_updated_date == today and info_progress.is_completed:
+                            self.article_read_today = True
+                            logger.info("아티클 상태 로드: 오늘 이미 읽었음")
+                        else:
+                            self.article_read_today = False
+                    else:
+                        self.article_read_today = False
+                else:
+                    self.article_read_today = False
+
+        except Exception as e:
+            logger.error(f"챌린지 상태 로드 오류: {e}", exc_info=True)
+            self.quiz_answered = False
+            self.quiz_is_correct = False
+            self.article_read_today = False
+
+    async def answer_quiz(self, is_correct: bool):
+        """퀴즈 답변 처리 (정답: True, 오답: False)"""
+        if not self.is_logged_in:
+            self.challenge_message = "로그인 후 이용해주세요."
+            return
+
+        # 이미 오늘 풀었으면 무시
+        if self.quiz_answered:
+            return
+
+        self.quiz_answered = True
+        self.quiz_is_correct = is_correct
+
+        # 정답인 경우에만 챌린지 진행도 업데이트
+        if is_correct:
+            await self.complete_daily_quiz()
+        else:
+            self.challenge_message = "틀렸습니다. 내일 다시 도전해주세요!"
 
