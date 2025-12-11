@@ -24,38 +24,38 @@ from .pages.ranking import ranking_page
 app = rx.App()
 
 # 1. 메인 홈 화면 라우팅 (EcoJourney.py 파일 내 home_page 함수 사용)
-app.add_page(home_page, route="/", title="EcoJourney | 시작")
+app.add_page(home_page, route="/", title="EcoJourney | 시작", on_load=AppState.hydrate_auth)
 
 # 2. 서비스 소개 화면 라우팅
-app.add_page(intro_page, route="/intro", title="EcoJourney | 소개")
+app.add_page(intro_page, route="/intro", title="EcoJourney | 소개", on_load=AppState.hydrate_auth)
 # 2-1. 정보글 페이지
-app.add_page(info_page, route="/info", title="EcoJourney | 정보글", on_load=AppState.load_active_challenges)
+app.add_page(info_page, route="/info", title="EcoJourney | 정보글", on_load=[AppState.hydrate_auth, AppState.load_active_challenges])
 
 # 2-1. 로그인/회원가입 화면 라우팅
-app.add_page(auth_page, route="/auth", title="EcoJourney | 로그인")
+app.add_page(auth_page, route="/auth", title="EcoJourney | 로그인", on_load=AppState.hydrate_auth)
 
 # 3. 카테고리 입력 화면 라우팅 (CATEGORY_CONFIG 기반 자동 등록)
-app.add_page(transportation_page, route="/input/transportation", title="EcoJourney | 교통")
-app.add_page(food_page, route="/input/food", title="EcoJourney | 식품")
-app.add_page(clothing_page, route="/input/clothing", title="EcoJourney | 의류")
-app.add_page(electricity_page, route="/input/electricity", title="EcoJourney | 전기")
-app.add_page(waste_page, route="/input/waste", title="EcoJourney | 쓰레기")
-app.add_page(water_page, route="/input/water", title="EcoJourney | 물")
+app.add_page(transportation_page, route="/input/transportation", title="EcoJourney | 교통", on_load=AppState.hydrate_auth)
+app.add_page(food_page, route="/input/food", title="EcoJourney | 식품", on_load=AppState.hydrate_auth)
+app.add_page(clothing_page, route="/input/clothing", title="EcoJourney | 의류", on_load=AppState.hydrate_auth)
+app.add_page(electricity_page, route="/input/electricity", title="EcoJourney | 전기", on_load=AppState.hydrate_auth)
+app.add_page(waste_page, route="/input/waste", title="EcoJourney | 쓰레기", on_load=AppState.hydrate_auth)
+app.add_page(water_page, route="/input/water", title="EcoJourney | 물", on_load=AppState.hydrate_auth)
 
 
 # 4. 결과 리포트 화면 라우팅
-app.add_page(report_page, route="/report", title="EcoJourney | 결과 리포트")
+app.add_page(report_page, route="/report", title="EcoJourney | 결과 리포트", on_load=AppState.hydrate_auth)
 
 # 5. 마이페이지 라우팅
-app.add_page(mypage_page, route="/mypage", title="EcoJourney | 마이페이지", on_load=AppState.load_mypage_data)
+app.add_page(mypage_page, route="/mypage", title="EcoJourney | 마이페이지", on_load=[AppState.hydrate_auth, AppState.load_mypage_data])
 
 # 6. 단과대 대결 페이지 라우팅
-app.add_page(battle_page, route="/battle", title="EcoJourney | 단과대 대결", on_load=AppState.load_current_battle)
+app.add_page(battle_page, route="/battle", title="EcoJourney | 단과대 대결", on_load=[AppState.hydrate_auth, AppState.load_current_battle])
 
 # 7. 저번주 랭킹 페이지 라우팅
 app.add_page(
     ranking_page, 
     route="/ranking", 
     title="EcoJourney | 랭킹", 
-    on_load=AppState.load_ranking_data
+    on_load=[AppState.hydrate_auth, AppState.load_ranking_data]
 )

@@ -4,11 +4,13 @@
 
 import reflex as rx
 from typing import Optional
-from datetime import datetime
-import hashlib
+import sqlite3
 import logging
+import json
+from pydantic import ValidationError
 from .base import BaseState
-from ..models import User
+from ..ai.services import auth_service
+from ..schemas.user import UserCreate
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +49,6 @@ class AuthState(BaseState):
     def set_signup_college(self, value: str):
         self.signup_college = value
     
-    def _hash_password(self, password: str) -> str:
-        """비밀번호를 해시화합니다."""
-        return hashlib.sha256(password.encode()).hexdigest()
-    
     async def signup(self):
         """회원가입 처리"""
         self.auth_error_message = ""
@@ -60,44 +58,46 @@ class AuthState(BaseState):
             return
         
         try:
-            # 새 사용자 생성 (기존 사용자 확인은 저장 시도 후 오류로 처리)
-            hashed_password = self._hash_password(self.signup_password)
-            new_user = User(
-                student_id=self.signup_student_id,
-                password=hashed_password,
-                college=self.signup_college,
-                current_points=0,
-                created_at=datetime.now()
-            )
-            
+            # 백엔드 Auth 서비스(bcrypt) 사용
             try:
-                # CarbonLog와 동일한 방식으로 저장
-                # SQLModel Session을 직접 사용
-                from sqlmodel import Session, create_engine
-                import os
-                
-                # 데이터베이스 파일 경로 (Reflex 기본값)
-                db_path = os.path.join(os.getcwd(), "reflex.db")
-                db_url = f"sqlite:///{db_path}"
-                engine = create_engine(db_url, echo=False)
-                
-                with Session(engine) as session:
-                    session.add(new_user)
-                    session.commit()
-                    session.refresh(new_user)
-            except Exception as save_error:
-                error_str = str(save_error).lower()
-                if "unique" in error_str or "duplicate" in error_str or "constraint" in error_str:
-                    self.auth_error_message = "이미 존재하는 학번입니다."
-                    return
-                else:
-                    raise  # 다른 오류는 다시 발생시킴
+                user_payload = UserCreate(
+                    student_id=self.signup_student_id.strip(),
+                    password=self.signup_password,
+                    college=self.signup_college.strip(),
+                )
+            except ValidationError as ve:
+                # 비밀번호 길이 등 입력 검증 메시지 노출
+                self.auth_error_message = "비밀번호는 최소 6자 이상 입력해주세요."
+                logger.warning(f"회원가입 검증 오류: {ve}")
+                return
+            try:
+                auth_service.create_user(user_payload)
+            except sqlite3.IntegrityError:
+                self.auth_error_message = "이미 존재하는 학번입니다."
+                return
+            
+            # 가입 후 사용자 정보 조회
+            user_info = auth_service.get_user(user_payload.student_id)
+            if not user_info:
+                self.auth_error_message = "회원정보를 불러오지 못했습니다."
+                return
             
             # 로그인 상태로 전환
-            self.current_user_id = self.signup_student_id
-            self.current_user_college = self.signup_college
-            self.current_user_points = 0
+            self.current_user_id = user_info.student_id
+            self.current_user_college = user_info.college
+            self.current_user_points = user_info.current_points
             self.is_logged_in = True
+            
+            # 클라이언트 로컬 스토리지에 로그인 정보 저장 (지원되는 경우)
+            if hasattr(rx, "set_local_storage"):
+                await rx.set_local_storage(
+                    "auth_user",
+                    {
+                        "student_id": self.current_user_id,
+                        "college": self.current_user_college,
+                        "current_points": self.current_user_points,
+                    },
+                )
             
             # 폼 초기화
             self.signup_student_id = ""
@@ -120,35 +120,20 @@ class AuthState(BaseState):
             return
         
         try:
-            # 사용자 조회 (student_id로 검색)
-            # SQLModel Session을 직접 사용하여 조회 (회원가입과 동일한 방식)
-            user = None
-            try:
-                from sqlmodel import Session, create_engine, select
-                import os
-                
-                db_path = os.path.join(os.getcwd(), "reflex.db")
-                db_url = f"sqlite:///{db_path}"
-                engine = create_engine(db_url, echo=False)
-                
-                with Session(engine) as session:
-                    statement = select(User).where(User.student_id == self.login_student_id)
-                    result = session.exec(statement).first()
-                    if result:
-                        user = result
-            except Exception as session_error:
-                logger.error(f"사용자 조회 오류: {session_error}", exc_info=True)
-                self.auth_error_message = f"로그인 처리 중 오류가 발생했습니다: {str(session_error)}"
+            # 입력값 정규화
+            login_id = self.login_student_id.strip()
+            login_pw = self.login_password
+            
+            # 백엔드 검증 (bcrypt)
+            ok = auth_service.verify_user(login_id, login_pw)
+            if not ok:
+                self.auth_error_message = "학번 또는 비밀번호가 올바르지 않습니다."
                 return
             
+            # 사용자 정보 조회
+            user = auth_service.get_user(login_id)
             if not user:
                 self.auth_error_message = "존재하지 않는 학번입니다."
-                return
-            
-            # 비밀번호 확인
-            hashed_password = self._hash_password(self.login_password)
-            if user.password != hashed_password:
-                self.auth_error_message = "비밀번호가 일치하지 않습니다."
                 return
             
             # 로그인 성공
@@ -156,6 +141,17 @@ class AuthState(BaseState):
             self.current_user_college = user.college
             self.current_user_points = user.current_points
             self.is_logged_in = True
+            
+            # 클라이언트 로컬 스토리지에 로그인 정보 저장 (지원되는 경우)
+            if hasattr(rx, "set_local_storage"):
+                await rx.set_local_storage(
+                    "auth_user",
+                    {
+                        "student_id": self.current_user_id,
+                        "college": self.current_user_college,
+                        "current_points": self.current_user_points,
+                    },
+                )
             
             # 폼 초기화
             self.login_student_id = ""
@@ -178,12 +174,35 @@ class AuthState(BaseState):
     
     async def logout(self):
         """로그아웃 처리"""
+        if hasattr(rx, "remove_local_storage"):
+            await rx.remove_local_storage("auth_user")
         self.current_user_id = None
         self.current_user_college = None
         self.current_user_points = 0
         self.is_logged_in = False
         self.all_activities = []
         return rx.redirect("/")
+
+    async def hydrate_auth(self):
+        """클라이언트 로컬 스토리지에서 로그인 정보 복원"""
+        try:
+            if not hasattr(rx, "get_local_storage"):
+                return
+            data = await rx.get_local_storage("auth_user")
+            if not data:
+                return
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    data = None
+            if isinstance(data, dict):
+                self.current_user_id = data.get("student_id")
+                self.current_user_college = data.get("college")
+                self.current_user_points = data.get("current_points") or 0
+                self.is_logged_in = bool(self.current_user_id)
+        except Exception as e:
+            logger.warning(f"로그인 정보 복원 실패: {e}")
 
 
 

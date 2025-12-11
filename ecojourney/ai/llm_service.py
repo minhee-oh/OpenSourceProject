@@ -18,15 +18,11 @@ load_dotenv(override=True) # 프로젝트 루트(OpenSourceProject/.env)에서 �
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # .env에서 키 읽기
 MODEL_NAME = "gemini-flash-latest"
 
-# 🔍 디버그용: 키 앞부분만 찍어보기 (None일 때도 안전하게)
-key_prefix = GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE"
-print(f"[DEBUG] llm_service loaded. GEMINI_API_KEY prefix: {key_prefix}")
-logger.info(f"[llm_service] GEMINI_API_KEY prefix: {key_prefix}")
-
+# 키 존재 여부만 로깅 (민감정보 미노출)
 if not GEMINI_API_KEY:
     logger.error("[llm_service] ❌ GEMINI_API_KEY 환경변수가 없습니다. .env 파일을 확인하세요.")
 else:
-    logger.info("[llm_service] 🔑 Gemini API Key 로드 성공")
+    logger.info("[llm_service] 🔑 Gemini API Key 로드 확인")
 
 # -------------------------------
 # 2) Gemini SDK 로딩

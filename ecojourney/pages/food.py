@@ -224,6 +224,11 @@ def food_input_field(label: str, value_name: str, unit_name: str, sub_name: str)
                 ),
                 rx.box(width="140px"),  # 하위 카테고리가 없으면 빈 공간
             ),
+            rx.input(
+                type="hidden",
+                name=unit_name,
+                default_value="회",
+            ),
             rx.text(
                 "회",
                 min_width="100px",

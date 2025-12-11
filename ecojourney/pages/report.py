@@ -620,60 +620,6 @@ def report_page() -> rx.Component:
                                     max_width="800px",
                                 ),
                                 
-                                # 대안 행동
-                                rx.cond(
-                                    AppState.ai_alternatives.length() > 0,
-                                    rx.box(
-                                        rx.vstack(
-                                            rx.heading("🔄 대안 행동 추천", size="5", margin_bottom="10px"),
-                                            rx.foreach(
-                                                AppState.ai_alternatives,
-                                                lambda alt: rx.vstack(
-                                                    rx.hstack(
-                                                        rx.text("현재: ", font_weight="bold", size="3"),
-                                                        rx.text(
-                                                            alt.get("current", "") if isinstance(alt, dict) else "",
-                                                            size="3",
-                                                            color="red.600",
-                                                        ),
-                                                        spacing="2",
-                                                    ),
-                                                    rx.hstack(
-                                                        rx.text("대안: ", font_weight="bold", size="3"),
-                                                        rx.text(
-                                                            alt.get("alternative", "") if isinstance(alt, dict) else "",
-                                                            size="3",
-                                                            color="green.600",
-                                                        ),
-                                                        spacing="2",
-                                                    ),
-                                                    rx.text(
-                                                        f"예상 감소량: {alt.get('reduction', 0)}%" if isinstance(alt, dict) else "",
-                                                        size="2",
-                                                        color="blue.600",
-                                                        margin_top="5px",
-                                                    ),
-                                                    padding="15px",
-                                                    border="1px solid",
-                                                    border_color="gray.300",
-                                                    border_radius="8px",
-                                                    margin_bottom="10px",
-                                                    width="100%",
-                                                ),
-                                            ),
-                                            spacing="2",
-                                        ),
-                                        padding="20px",
-                                        border="1px solid",
-                                        border_color="purple.300",
-                                        border_radius="12px",
-                                        background="purple.50",
-                                        margin_bottom="20px",
-                                        width="100%",
-                                        max_width="800px",
-                                    ),
-                                ),
-                                
                                 spacing="3",
                                 align="center",
                                 width="100%",

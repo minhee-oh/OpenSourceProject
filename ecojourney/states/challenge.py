@@ -271,7 +271,6 @@ class ChallengeState(MileageState):
             db_url = f"sqlite:///{db_path}"
             engine = create_engine(db_url, echo=False)
             
-            all_progress = []
             today = date.today()
             this_monday = today - timedelta(days=today.weekday())
             
@@ -280,65 +279,67 @@ class ChallengeState(MileageState):
                     ChallengeProgress.student_id == self.current_user_id
                 )
                 all_progress = list(session.exec(statement).all())
-            
-            # 챌린지 정보와 진행도 결합
-            progress_dict = {p.challenge_id: p for p in all_progress}
-            
-            result = []
-            for challenge in self.active_challenges:
-                challenge_id = challenge["id"]
-                progress = progress_dict.get(challenge_id)
+
+                # 챌린지 정보와 진행도 결합
+                progress_dict = {p.challenge_id: p for p in all_progress}
                 
-                if progress:
-                    # 일일/주간 리셋 처리 (UI 조회 시점에도 적용)
-                    last_updated_date = progress.last_updated.date() if progress.last_updated else None
-                    if last_updated_date is None:
-                        last_updated_date = (datetime.now() - timedelta(days=1)).date()
-                        progress.last_updated = datetime.combine(last_updated_date, datetime.min.time())
+                result = []
+                for challenge in self.active_challenges:
+                    challenge_id = challenge["id"]
+                    progress = progress_dict.get(challenge_id)
                     
-                    if challenge["type"] in ["DAILY_INFO", "DAILY_QUIZ"]:
-                        if last_updated_date != today:
-                            progress.current_value = 0
-                            progress.is_completed = False
-                            progress.completed_at = None
-                            progress.last_updated = datetime.now()
-                            session.add(progress)
-                            session.commit()
-                    
-                    if challenge["type"] == "WEEKLY_STREAK":
-                        if last_updated_date and last_updated_date < this_monday:
-                            progress.current_value = 0
-                            progress.is_completed = False
-                            progress.completed_at = None
-                            progress.last_updated = datetime.now()
-                            session.add(progress)
-                            session.commit()
-                    
-                    progress_percent = (progress.current_value / challenge["goal_value"]) * 100 if challenge["goal_value"] > 0 else 0
-                    result.append({
-                        "challenge_id": challenge_id,
-                        "title": challenge["title"],
-                        "type": challenge["type"],
-                        "goal_value": challenge["goal_value"],
-                        "current_value": progress.current_value,
-                        "progress_percent": min(progress_percent, 100),
-                        "is_completed": progress.is_completed,
-                        "reward_points": challenge["reward_points"]
-                    })
-                else:
-                    # 진행도가 없으면 0으로 시작
-                    result.append({
-                        "challenge_id": challenge_id,
-                        "title": challenge["title"],
-                        "type": challenge["type"],
-                        "goal_value": challenge["goal_value"],
-                        "current_value": 0,
-                        "progress_percent": 0,
-                        "is_completed": False,
-                        "reward_points": challenge["reward_points"]
-                    })
-            
-            self.user_challenge_progress = result
+                    if progress:
+                        # 일일/주간 리셋 처리 (UI 조회 시점에도 적용)
+                        last_updated_date = progress.last_updated.date() if progress.last_updated else None
+                        if last_updated_date is None:
+                            last_updated_date = (datetime.now() - timedelta(days=1)).date()
+                            progress.last_updated = datetime.combine(last_updated_date, datetime.min.time())
+                        
+                        if challenge["type"] in ["DAILY_INFO", "DAILY_QUIZ"]:
+                            if last_updated_date != today:
+                                progress.current_value = 0
+                                progress.is_completed = False
+                                progress.completed_at = None
+                                progress.last_updated = datetime.now()
+                                session.add(progress)
+                                session.commit()
+                                session.refresh(progress)
+                        
+                        if challenge["type"] == "WEEKLY_STREAK":
+                            if last_updated_date and last_updated_date < this_monday:
+                                progress.current_value = 0
+                                progress.is_completed = False
+                                progress.completed_at = None
+                                progress.last_updated = datetime.now()
+                                session.add(progress)
+                                session.commit()
+                                session.refresh(progress)
+                        
+                        progress_percent = (progress.current_value / challenge["goal_value"]) * 100 if challenge["goal_value"] > 0 else 0
+                        result.append({
+                            "challenge_id": challenge_id,
+                            "title": challenge["title"],
+                            "type": challenge["type"],
+                            "goal_value": challenge["goal_value"],
+                            "current_value": progress.current_value,
+                            "progress_percent": min(progress_percent, 100),
+                            "is_completed": progress.is_completed,
+                            "reward_points": challenge["reward_points"]
+                        })
+                    else:
+                        # 진행도가 없으면 0으로 시작
+                        result.append({
+                            "challenge_id": challenge_id,
+                            "title": challenge["title"],
+                            "type": challenge["type"],
+                            "goal_value": challenge["goal_value"],
+                            "current_value": 0,
+                            "progress_percent": 0,
+                            "is_completed": False,
+                            "reward_points": challenge["reward_points"]
+                        })
+                
+                self.user_challenge_progress = result
             
         except Exception as e:
             logger.error(f"사용자 챌린지 진행도 로드 오류: {e}")

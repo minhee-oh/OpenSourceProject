@@ -1402,24 +1402,74 @@ class CarbonState(AuthState):
         self.ai_alternatives = []
         
         try:
-            from ..service.ai_coach import generate_coaching_message
-            from ..service.models import AICoachRequest
+            from ..ai.llm_service import get_coaching_feedback
+            import json
             
-            # AI 코칭 요청 생성
-            request = AICoachRequest(
-                total_carbon=self.total_carbon_emission,
-                category_breakdown=self.category_emission_breakdown,
-                activities=self.all_activities
+            # 총배출량 정합성 검증: 카테고리 합계와 total_carbon_emission 일치 보정
+            breakdown = self.category_emission_breakdown or {}
+            try:
+                breakdown_sum = float(sum(float(v) for v in breakdown.values())) if breakdown else 0.0
+            except Exception:
+                breakdown_sum = float(self.total_carbon_emission or 0.0)
+            
+            total_carbon = float(self.total_carbon_emission or 0.0)
+            # 합계와 차이가 크면 합계 기준으로 보정
+            if abs(breakdown_sum - total_carbon) > 1e-6:
+                logger.info(
+                    "AI 요청용 총배출량 보정: breakdown_sum=%.4f, total=%.4f",
+                    breakdown_sum,
+                    total_carbon,
+                )
+                total_carbon = breakdown_sum
+            
+            payload = {
+                "category_carbon_data": self.category_emission_breakdown or {},
+                "total_carbon_kg": total_carbon,
+                "category_activity_data": self.category_emission_breakdown or {},
+            }
+            
+            feedback_json = get_coaching_feedback(payload)
+            parsed = json.loads(feedback_json)
+            
+            # 분석 요약
+            final_screen = parsed.get("final_report_screen", {}) if isinstance(parsed, dict) else {}
+            today_screen = parsed.get("today_result_screen", {}) if isinstance(parsed, dict) else {}
+            
+            self.ai_analysis_result = (
+                final_screen.get("total_summary_text")
+                or today_screen.get("usage_summary_text")
+                or "AI 분석 결과를 불러올 수 없습니다."
             )
             
-            # AI 분석 결과 생성
-            response = generate_coaching_message(request)
+            # 행동 제안
+            recos = final_screen.get("recommendations", []) if isinstance(final_screen, dict) else []
+            suggestions = []
+            for r in recos:
+                if isinstance(r, dict):
+                    action = r.get("action")
+                    detail = r.get("detail")
+                    if action and detail:
+                        suggestions.append(f"{action}: {detail}")
+                    elif action:
+                        suggestions.append(action)
+            self.ai_suggestions = suggestions[:5] if suggestions else []
             
-            self.ai_analysis_result = response.analysis
-            self.ai_suggestions = response.suggestions
-            self.ai_alternatives = response.alternative_actions 
+            # 정책/대안(폴백)
+            policy_recos = final_screen.get("policy_recommendations", []) if isinstance(final_screen, dict) else []
+            alternatives = []
+            for p in policy_recos:
+                if isinstance(p, dict):
+                    name = p.get("name") or p.get("title") or ""
+                    desc = p.get("description") or p.get("detail") or ""
+                    if name or desc:
+                        alternatives.append({
+                            "current": name,
+                            "alternative": "",
+                            "impact": desc,
+                        })
+            self.ai_alternatives = alternatives
             
-            logger.info(f"AI 분석 결과 생성 완료")
+            logger.info("AI 분석 결과 생성 완료 (Gemini + 폴백)")
             
         except Exception as e:
             logger.error(f"AI 분석 결과 생성 오류: {e}", exc_info=True)

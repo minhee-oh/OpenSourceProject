@@ -3,6 +3,19 @@ import sqlite3
 import bcrypt
 
 from ecojourney.db import get_connection
+from ecojourney.db.init_db import init_db
+
+# DB 초기화 보장
+_db_initialized = False
+
+
+def _ensure_db():
+    """스키마를 한 번만 보장 (idempotent)"""
+    global _db_initialized
+    if _db_initialized:
+        return
+    init_db()  # CREATE TABLE IF NOT EXISTS 로 안전하게 초기화
+    _db_initialized = True
 from ecojourney.schemas.user import UserCreate, User
 
 
@@ -10,6 +23,7 @@ from ecojourney.schemas.user import UserCreate, User
 # 내부 전용: student_id로 users 테이블 row 조회
 # ======================================================
 def _get_user_row(student_id: str) -> Optional[sqlite3.Row]:
+    _ensure_db()
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -25,6 +39,7 @@ def _get_user_row(student_id: str) -> Optional[sqlite3.Row]:
 # 회원가입: 비밀번호 해싱 후 users 테이블에 저장
 # ======================================================
 def create_user(user: UserCreate) -> None:
+    _ensure_db()
     conn = get_connection()
     cur = conn.cursor()
 
