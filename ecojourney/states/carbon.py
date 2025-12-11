@@ -6,6 +6,7 @@ import reflex as rx
 from typing import Dict, List, Any, Optional
 from datetime import date, datetime
 import logging
+from sqlalchemy import text
 from .base import BaseState
 from .auth import AuthState
 from ..models import User, CarbonLog
@@ -746,16 +747,31 @@ class CarbonState(AuthState):
             print(f"[저장] 절약량: {self.total_saved_emission}kg, 절약 금액: {self.saved_money}원")
             
             with Session(engine) as session:
+                # 과거 챌린지 로그(source가 잘못된 경우)를 정정하여 덮어쓰기 방지
+                try:
+                    session.exec(
+                        text(
+                            "UPDATE carbonlog "
+                            "SET source = 'challenge' "
+                            "WHERE (source IS NULL OR source = 'carbon_input') "
+                            "AND ai_feedback LIKE '챌린지 보상:%'"
+                        )
+                    )
+                    session.commit()
+                except Exception as mig_err:
+                    logger.error(f"[저장] 챌린지 로그 소스 수정 오류: {mig_err}")
+                
                 stmt = select(CarbonLog).where(
                     CarbonLog.student_id == self.current_user_id,
-                    CarbonLog.log_date == today
+                    CarbonLog.log_date == today,
+                    CarbonLog.source == "carbon_input"
                 )
                 existing_log = session.exec(stmt).first()
                 is_new_log = existing_log is None
-                # 오늘 날짜 로그 존재 여부 상태 반영
+                # 오늘 날짜 탄소 입력 로그 존재 여부 상태 반영
                 self.has_today_log = not is_new_log
-            logger.info(f"[저장] 기존 로그 존재 여부: {not is_new_log}")
-            print(f"[저장] 기존 로그 존재 여부: {not is_new_log}, is_new_log={is_new_log}")
+            logger.info(f"[저장] 기존 탄소 로그 존재 여부: {not is_new_log}")
+            print(f"[저장] 기존 탄소 로그 존재 여부: {not is_new_log}, is_new_log={is_new_log}")
             
             # 테스트용: 같은 날에 여러 번 저장 가능 (제한 제거)
             
@@ -776,10 +792,11 @@ class CarbonState(AuthState):
                     logger.error(f"탄소 로그 저장 오류: 사용자 {self.current_user_id}를 찾을 수 없음")
                     return
                 
-                # 오늘 로그 조회 (같은 세션에서)
+                # 오늘 탄소 입력 로그 조회 (같은 세션에서, source 필터)
                 log_stmt = select(CarbonLog).where(
                     CarbonLog.student_id == self.current_user_id,
-                    CarbonLog.log_date == today
+                    CarbonLog.log_date == today,
+                    CarbonLog.source == "carbon_input"
                 )
                 log = session.exec(log_stmt).first()
                 
@@ -796,6 +813,7 @@ class CarbonState(AuthState):
                     log.total_emission = total_emission
                     log.activities_json = activities_json
                     log.points_earned = points_earned
+                    log.source = "carbon_input"
                 else:
                     log = CarbonLog(
                         student_id=self.current_user_id,
@@ -806,6 +824,7 @@ class CarbonState(AuthState):
                         total_emission=total_emission,
                         activities_json=activities_json,
                         points_earned=points_earned,
+                        source="carbon_input",
                         created_at=datetime.now()
                     )
                     logger.info("[저장] 새 로그 생성")
@@ -915,7 +934,8 @@ class CarbonState(AuthState):
             
             logs = await CarbonLog.find(
                 CarbonLog.student_id == self.current_user_id,
-                CarbonLog.log_date == target_date
+                CarbonLog.log_date == target_date,
+                CarbonLog.source == "carbon_input"
             )
             
             if logs:
@@ -941,7 +961,8 @@ class CarbonState(AuthState):
         
         try:
             logs = await CarbonLog.find(
-                CarbonLog.student_id == self.current_user_id
+                CarbonLog.student_id == self.current_user_id,
+                CarbonLog.source == "carbon_input"
             )
             
             # 날짜순으로 정렬 (최신순)
@@ -985,7 +1006,10 @@ class CarbonState(AuthState):
             
             logs = []
             with Session(engine) as session:
-                statement = select(CarbonLog).where(CarbonLog.student_id == self.current_user_id)
+                statement = select(CarbonLog).where(
+                    CarbonLog.student_id == self.current_user_id,
+                    CarbonLog.source == "carbon_input"
+                )
                 logs = list(session.exec(statement).all())
             
             if not logs:
@@ -1261,14 +1285,21 @@ class CarbonState(AuthState):
             total_average = get_total_average()
             total_user_emission = self.total_carbon_emission
             difference = total_user_emission - total_average
+            abs_difference = abs(difference)
+            percentage = (difference / total_average * 100) if total_average > 0 else 0
             
             self.total_average_comparison = {
                 "user": round(total_user_emission, 2),
                 "average": round(total_average, 2),
                 "difference": round(difference, 2),
-                "abs_difference": round(abs(difference), 2),  # 절댓값 미리 계산
-                "percentage": round((difference / total_average * 100), 1) if total_average > 0 else 0,
-                "is_better": difference < 0
+                "abs_difference": round(abs_difference, 2),
+                "percentage": round(percentage, 1),
+                "is_better": difference < 0,
+                # 문자열 포맷은 UI에서 Var 포맷 오류를 피하기 위해 미리 계산
+                "average_str": f"{total_average:.2f} kgCO₂e",
+                "user_str": f"{total_user_emission:.2f} kgCO₂e",
+                "abs_difference_str": f"차이: {abs_difference:.2f} kgCO₂e",
+                "percentage_str": f"({percentage:.1f}%)",
             }
             
             # 카테고리별 평균 비교는 제거

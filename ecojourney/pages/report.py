@@ -446,7 +446,7 @@ def report_page() -> rx.Component:
             
             # 총 평균 비교만 표시
             rx.cond(
-                AppState.is_report_calculated & ('user' in AppState.total_average_comparison),
+                AppState.is_report_calculated & AppState.total_average_comparison.contains('user'),
                 rx.vstack(
                     rx.heading("📊 총 배출량 평균 비교", size="6", margin_bottom="20px"),
                     
@@ -462,7 +462,7 @@ def report_page() -> rx.Component:
                                     rx.vstack(
                                         rx.text("한국인 평균", size="3", color="gray.700", font_weight="bold"),
                                         rx.text(
-                                            f"{AppState.total_average_comparison.get('average', 0):.2f} kgCO₂e",
+                                            AppState.total_average_comparison.get('average_str', "0.00 kgCO₂e"),
                                             size="5",
                                             color="blue.700",
                                             font_weight="bold",
@@ -474,7 +474,7 @@ def report_page() -> rx.Component:
                                     rx.vstack(
                                         rx.text("내 배출량", size="3", color="gray.700", font_weight="bold"),
                                         rx.text(
-                                            f"{AppState.total_average_comparison.get('user', 0):.2f} kgCO₂e",
+                                            AppState.total_average_comparison.get('user_str', "0.00 kgCO₂e"),
                                             size="5",
                                             color=rx.cond(
                                                 AppState.total_average_comparison.get('is_better', False),
@@ -511,8 +511,12 @@ def report_page() -> rx.Component:
                                         font_weight="bold",
                                     ),
                                     rx.text(
-                                        f"차이: {AppState.total_average_comparison.get('abs_difference', 0):.2f} kgCO₂e "
-                                        f"({AppState.total_average_comparison.get('percentage', 0):.1f}%)",
+                                        AppState.total_average_comparison.get('abs_difference_str', "차이: 0.00 kgCO₂e"),
+                                        size="3",
+                                        color="gray.600",
+                                    ),
+                                    rx.text(
+                                        AppState.total_average_comparison.get('percentage_str', "(0.0%)"),
                                         size="3",
                                         color="gray.600",
                                     ),

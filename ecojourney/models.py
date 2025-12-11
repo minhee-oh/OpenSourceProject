@@ -29,6 +29,7 @@ class CarbonLog(rx.Model, table=True):
     """
     student_id: str  # User 테이블 참조 (수동 조인)
     log_date: date = date.today()
+    source: str = "carbon_input"  # 포인트 발생 출처: carbon_input, challenge 등
     
     # 입력 데이터 (간단한 예시 필드 - 필요시 확장 가능)
     transport_km: float = 0.0

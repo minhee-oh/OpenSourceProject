@@ -153,12 +153,21 @@ def mypage_page() -> rx.Component:
                                     rx.foreach(
                                         AppState.points_log,
                                         lambda log: rx.hstack(
-                                            rx.text(
-                                                log["date"],
-                                                color="white",
-                                                size="4",
-                                                font_weight="bold",
-                                                width="150px",
+                                            rx.vstack(
+                                                rx.text(
+                                                    log["date"],
+                                                    color="white",
+                                                    size="4",
+                                                    font_weight="bold",
+                                                ),
+                                                rx.text(
+                                                    log.get("description", ""),
+                                                    color="gray.300",
+                                                    size="3",
+                                                ),
+                                                spacing="1",
+                                                align="start",
+                                                width="60%",
                                             ),
                                             rx.text(
                                                 f"+{log['points']} 포인트",

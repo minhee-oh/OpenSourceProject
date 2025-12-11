@@ -43,31 +43,46 @@ class ChallengeState(MileageState):
             db_url = f"sqlite:///{db_path}"
             engine = create_engine(db_url, echo=False)
 
+            # 보상/목표 기본값 정의
             default_challenges = [
-                {"title": "7일 연속 기록", "type": "WEEKLY_STREAK", "goal_value": 7, "reward_points": 700},
-                {"title": "정보 글 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 150},
-                {"title": "OX 퀴즈 풀기", "type": "DAILY_QUIZ", "goal_value": 1, "reward_points": 200},
+                {"title": "7일 연속 기록", "type": "WEEKLY_STREAK", "goal_value": 7, "reward_points": 10},
+                {"title": "정보 글 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 1},
+                {"title": "OX 퀴즈 풀기", "type": "DAILY_QUIZ", "goal_value": 1, "reward_points": 1},
             ]
 
             with Session(engine) as session:
                 titles = [item["title"] for item in default_challenges]
                 existing = session.exec(select(Challenge).where(Challenge.title.in_(titles))).all()
-                existing_titles = {c.title for c in existing}
+                existing_map = {c.title: c for c in existing}
 
                 created = 0
                 for item in default_challenges:
-                    if item["title"] in existing_titles:
-                        continue
-                    ch = Challenge(
-                        title=item["title"],
-                        type=item["type"],
-                        goal_value=item["goal_value"],
-                        reward_points=item["reward_points"],
-                        is_active=True,
-                        created_at=datetime.now()
-                    )
-                    session.add(ch)
-                    created += 1
+                    existing_ch = existing_map.get(item["title"])
+                    if existing_ch:
+                        updated = False
+                        if existing_ch.reward_points != item["reward_points"]:
+                            existing_ch.reward_points = item["reward_points"]
+                            updated = True
+                        if existing_ch.goal_value != item["goal_value"]:
+                            existing_ch.goal_value = item["goal_value"]
+                            updated = True
+                        if existing_ch.type != item["type"]:
+                            existing_ch.type = item["type"]
+                            updated = True
+                        if updated:
+                            session.add(existing_ch)
+                            created += 1  # reuse counter for commit trigger
+                    else:
+                        ch = Challenge(
+                            title=item["title"],
+                            type=item["type"],
+                            goal_value=item["goal_value"],
+                            reward_points=item["reward_points"],
+                            is_active=True,
+                            created_at=datetime.now()
+                        )
+                        session.add(ch)
+                        created += 1
                 if created:
                     session.commit()
         except Exception as e:
@@ -201,7 +216,7 @@ class ChallengeState(MileageState):
                 if progress.current_value >= challenge.goal_value:
                     progress.is_completed = True
                     progress.completed_at = datetime.now()
-
+                    
                     # 보상 지급
                     user = session.exec(
                         select(User).where(User.student_id == self.current_user_id)
@@ -210,7 +225,24 @@ class ChallengeState(MileageState):
                         user.current_points += challenge.reward_points
                         self.current_user_points = user.current_points
                         session.add(user)
-
+                    
+                    # 포인트 로그 기록 (챌린지 출처)
+                    try:
+                        from ..models import CarbonLog
+                        log_entry = CarbonLog(
+                            student_id=self.current_user_id,
+                            log_date=today,
+                            total_emission=0.0,
+                            activities_json="[]",
+                            points_earned=challenge.reward_points,
+                            source="challenge",
+                            ai_feedback=f"챌린지 보상: {challenge.title}",
+                            created_at=datetime.now()
+                        )
+                        session.add(log_entry)
+                    except Exception as log_error:
+                        logger.error(f"챌린지 포인트 로그 생성 오류: {log_error}", exc_info=True)
+                    
                     logger.info(f"챌린지 완료: {self.current_user_id}, 챌린지: {challenge.title}, 보상: {challenge.reward_points}")
 
                 # 진행도 저장 (세션 커밋)
@@ -240,6 +272,9 @@ class ChallengeState(MileageState):
             engine = create_engine(db_url, echo=False)
             
             all_progress = []
+            today = date.today()
+            this_monday = today - timedelta(days=today.weekday())
+            
             with Session(engine) as session:
                 statement = select(ChallengeProgress).where(
                     ChallengeProgress.student_id == self.current_user_id
@@ -255,6 +290,30 @@ class ChallengeState(MileageState):
                 progress = progress_dict.get(challenge_id)
                 
                 if progress:
+                    # 일일/주간 리셋 처리 (UI 조회 시점에도 적용)
+                    last_updated_date = progress.last_updated.date() if progress.last_updated else None
+                    if last_updated_date is None:
+                        last_updated_date = (datetime.now() - timedelta(days=1)).date()
+                        progress.last_updated = datetime.combine(last_updated_date, datetime.min.time())
+                    
+                    if challenge["type"] in ["DAILY_INFO", "DAILY_QUIZ"]:
+                        if last_updated_date != today:
+                            progress.current_value = 0
+                            progress.is_completed = False
+                            progress.completed_at = None
+                            progress.last_updated = datetime.now()
+                            session.add(progress)
+                            session.commit()
+                    
+                    if challenge["type"] == "WEEKLY_STREAK":
+                        if last_updated_date and last_updated_date < this_monday:
+                            progress.current_value = 0
+                            progress.is_completed = False
+                            progress.completed_at = None
+                            progress.last_updated = datetime.now()
+                            session.add(progress)
+                            session.commit()
+                    
                     progress_percent = (progress.current_value / challenge["goal_value"]) * 100 if challenge["goal_value"] > 0 else 0
                     result.append({
                         "challenge_id": challenge_id,
@@ -383,7 +442,7 @@ class ChallengeState(MileageState):
     points_log: List[Dict[str, Any]] = []
     
     async def load_points_log(self):
-        """포인트 획득 내역 로드 (날짜별)"""
+        """포인트 획득 내역 로드 (탄소 입력/챌린지 모두 포함)"""
         if not self.is_logged_in or not self.current_user_id:
             self.points_log = []
             return
@@ -402,7 +461,7 @@ class ChallengeState(MileageState):
                 stmt = select(CarbonLog).where(
                     CarbonLog.student_id == self.current_user_id,
                     CarbonLog.points_earned > 0
-                ).order_by(CarbonLog.log_date.desc())
+                ).order_by(CarbonLog.log_date.desc(), CarbonLog.created_at.desc())
                 
                 logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
                 print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
@@ -412,11 +471,18 @@ class ChallengeState(MileageState):
                 
                 result = []
                 for log in logs:
+                    source = getattr(log, "source", None) or "carbon_input"
+                    description = "탄소배출 기록" if source == "carbon_input" else "챌린지 보상"
+                    # ai_feedback에 챌린지 제목이 들어있으면 함께 표시
+                    if log.ai_feedback:
+                        description = log.ai_feedback
                     result.append({
                         "date": log.log_date.strftime("%Y-%m-%d") if log.log_date else "",
-                        "points": log.points_earned
+                        "points": log.points_earned,
+                        "source": source,
+                        "description": description
                     })
-                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점")
+                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점, 출처: {source}")
                 
                 self.points_log = result
                 logger.info(f"포인트 로그 로드 완료: {len(result)}개")
