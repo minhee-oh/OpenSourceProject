@@ -238,7 +238,10 @@ yarn-error.log*
 Thumbs.db
 
 /CLAUDE.md
+.claude
 
+package-lock.json
+package.json
 # 더미 데이터 및 테스트 데이터
 create_dummy_users.py
 create_dummy_battles.py
