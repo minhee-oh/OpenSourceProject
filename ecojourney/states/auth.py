@@ -38,12 +38,10 @@ class AuthState(BaseState):
         """로그인 세션을 브라우저 localStorage 및 쿠키에 저장"""
         # 쿠키에 user_id 저장 (Reflex 방식)
         self._session_user_id = self.current_user_id or ""
-        logger.info(f"[세션 저장] 쿠키에 저장: {self._session_user_id}")
 
         # localStorage에도 저장 (호환성을 위해)
         yield rx.call_script(
             f"""
-            console.log('[세션 저장] localStorage에 저장:', '{self.current_user_id}');
             localStorage.setItem('eco_user_id', '{self.current_user_id}');
             localStorage.setItem('eco_user_college', '{self.current_user_college}');
             localStorage.setItem('eco_user_points', '{self.current_user_points}');
@@ -55,12 +53,10 @@ class AuthState(BaseState):
         """localStorage 및 쿠키에서 세션 정보 삭제"""
         # 쿠키 삭제
         self._session_user_id = ""
-        logger.info(f"[세션 삭제] 쿠키 및 localStorage 삭제")
 
         # localStorage 삭제
         yield rx.call_script(
             """
-            console.log('[세션 삭제] localStorage 삭제');
             localStorage.removeItem('eco_user_id');
             localStorage.removeItem('eco_user_college');
             localStorage.removeItem('eco_user_points');
@@ -72,19 +68,14 @@ class AuthState(BaseState):
         """
         페이지 로드 시 쿠키에서 세션을 확인하고 복원
         """
-        logger.info(f"[세션 복원] 시작 - is_logged_in: {self.is_logged_in}")
-
         # 이미 로그인되어 있으면 복원할 필요 없음
         if self.is_logged_in:
-            logger.info("[세션 복원] 이미 로그인됨 - 복원 스킵")
             return
 
         # 쿠키에서 user_id 확인
         user_id = self._session_user_id
-        logger.info(f"[세션 복원] 쿠키에서 user_id 확인: {user_id}")
 
         if not user_id or user_id == "":
-            logger.warning("[세션 복원] 쿠키에 세션 정보 없음 - 로그인 필요")
             return
 
         try:
@@ -94,7 +85,6 @@ class AuthState(BaseState):
             user = get_user(user_id)
             if not user:
                 # 사용자가 존재하지 않으면 세션 삭제
-                logger.warning(f"세션 복원 실패 - 사용자 없음: {user_id}")
                 yield from self._clear_session_storage()
                 return
 
@@ -103,8 +93,6 @@ class AuthState(BaseState):
             self.current_user_college = user.college
             self.current_user_points = user.current_points
             self.is_logged_in = True
-
-            logger.info(f"세션 복원 성공: {self.current_user_id}")
 
         except Exception as e:
             logger.error(f"세션 복원 오류: {e}", exc_info=True)

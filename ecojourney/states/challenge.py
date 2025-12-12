@@ -469,12 +469,8 @@ class ChallengeState(MileageState):
                     CarbonLog.student_id == self.current_user_id,
                     CarbonLog.points_earned > 0
                 ).order_by(CarbonLog.log_date.desc(), CarbonLog.created_at.desc())
-                
-                logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                
+
                 logs = session.exec(stmt).all()
-                print(f"[포인트 로그] 조회 결과: {len(logs)}개")
 
                 result = []
                 for log in logs:
@@ -489,11 +485,8 @@ class ChallengeState(MileageState):
                         "source": source,
                         "description": description
                     })
-                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점, 출처: {source}")
-                
+
                 self.points_log = result
-                logger.info(f"포인트 로그 로드 완료: {len(result)}개")
-                print(f"[포인트 로그] 최종 결과: {len(result)}개")
 
         except Exception as e:
             logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
@@ -501,10 +494,7 @@ class ChallengeState(MileageState):
     
     def load_mypage_data(self):
         """마이페이지 모든 데이터 로드"""
-        logger.info(f"[마이페이지 로드] 시작 - is_logged_in: {self.is_logged_in}, user_id: {self.current_user_id}")
-
         if not self.is_logged_in or not self.current_user_id:
-            logger.warning(f"[마이페이지 로드] 조기 반환 - 로그인 안됨 (is_logged_in: {self.is_logged_in}, user_id: {self.current_user_id})")
             return
         
         try:
@@ -522,7 +512,6 @@ class ChallengeState(MileageState):
                 user = session.exec(user_stmt).first()
                 if user:
                     self.current_user_points = user.current_points
-                    logger.info(f"[마이페이지] 사용자 포인트 새로고침: {self.current_user_points}점")
         except Exception as e:
             logger.error(f"사용자 포인트 새로고침 오류: {e}", exc_info=True)
         
@@ -571,8 +560,6 @@ class ChallengeState(MileageState):
             self.monthly_emission = 0.0
             self.weekly_daily_data = []
             self.monthly_daily_data = []
-        
-        logger.info(f"마이페이지 데이터 로드 완료: {self.current_user_id}, 포인트: {self.current_user_points}점")
     
     async def save_carbon_log_to_db(self):
         """탄소 로그 저장 후 주간 챌린지 진행도 업데이트"""
@@ -703,13 +690,6 @@ class ChallengeState(MileageState):
                     "has_emission": has_emission
                 })
 
-            logger.info(f"대시보드 통계 로드 완료: 이번주 {self.weekly_emission}kg, 한달 {self.monthly_emission}kg")
-            logger.info(f"[디버그] monthly_daily_data 개수: {len(self.monthly_daily_data)}")
-            logger.info(f"[디버그] weekly_daily_data 개수: {len(self.weekly_daily_data)}")
-            if len(self.monthly_daily_data) > 0:
-                logger.info(f"[디버그] monthly_daily_data 첫 항목: {self.monthly_daily_data[0]}")
-                logger.info(f"[디버그] monthly_daily_data 마지막 항목: {self.monthly_daily_data[-1]}")
-            
         except Exception as e:
             logger.error(f"대시보드 통계 로드 오류: {e}", exc_info=True)
             self.weekly_emission = 0.0
