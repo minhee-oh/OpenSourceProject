@@ -420,13 +420,15 @@ def render_dashboard_section():
                                             ),
                                         ),
                                         spacing="2",
-                                        justify="between",
+                                        justify="center",
                                         align="end",
                                         width="100%",
+                                        max_width="400px",
                                         height="250px",
                                         padding="10px",
                                     ),
                                     spacing="2",
+                                    align="center",
                                 ),
                                 rx.text(
                                     "이번주 데이터가 없습니다.",
@@ -435,11 +437,13 @@ def render_dashboard_section():
                                 ),
                             ),
                             spacing="2",
+                            align="center",
                         ),
                         padding="20px",
                         border_radius="12px",
                         background="#F1F3F4",
-                        width="600px",
+                        width="500px",
+                        flex_shrink="0",
                     ),
 
                     # 최근 30일 일별 배출량 그래프 (꺾은선)
@@ -478,11 +482,23 @@ def render_dashboard_section():
                                             // 30일 그래프 렌더링을 위해 데이터를 기다립니다
                                             setTimeout(function() {
                                                 const data = window.monthlyData;
-                                                if (!data || data.length === 0) return;
+                                                console.log('[30일 그래프] 데이터:', data);
+
+                                                if (!data || data.length === 0) {
+                                                    console.log('[30일 그래프] 데이터 없음 또는 빈 배열');
+                                                    return;
+                                                }
 
                                                 const svg = document.getElementById('monthly-chart-svg');
                                                 const line = document.getElementById('emission-line');
                                                 const pointsGroup = document.getElementById('data-points');
+
+                                                if (!svg || !line || !pointsGroup) {
+                                                    console.log('[30일 그래프] SVG 요소를 찾을 수 없음');
+                                                    return;
+                                                }
+
+                                                console.log('[30일 그래프] 렌더링 시작, 데이터 개수:', data.length);
 
                                             const svgWidth = svg.clientWidth;
                                             const spacing = svgWidth / (data.length + 1);
@@ -587,14 +603,27 @@ def render_dashboard_section():
                                         }, 100);
                                         """
                                         ),
-                                        # 데이터를 JSON으로 숨겨서 전달
+                                        # 데이터를 JSON으로 전달
                                         rx.script(
                                             f"""
-                                            window.monthlyData = {rx.Var.create(AppState.monthly_daily_data).to_string()};
+                                            console.log('[스크립트 실행 시작]');
+                                            try {{
+                                                window.monthlyData = {AppState.monthly_daily_data};
+                                                console.log('[데이터 전달] window.monthlyData:', window.monthlyData);
+                                                console.log('[데이터 전달] Type:', typeof window.monthlyData);
+                                                console.log('[데이터 전달] Is Array:', Array.isArray(window.monthlyData));
+                                                if (window.monthlyData) {{
+                                                    console.log('[데이터 전달] Length:', window.monthlyData.length);
+                                                    if (window.monthlyData.length > 0) {{
+                                                        console.log('[데이터 전달] First item:', window.monthlyData[0]);
+                                                    }}
+                                                }}
+                                            }} catch (e) {{
+                                                console.error('[데이터 전달] Error:', e);
+                                                window.monthlyData = [];
+                                            }}
+                                            console.log('[스크립트 실행 완료]');
                                             """
-                                        ),
-                                        rx.html(
-                                            """<div id="monthly-data-json" style="display:none;"></div>"""
                                         ),
                                     ),
                                     rx.text("데이터가 없습니다.", color="gray.400", size="3"),
@@ -607,12 +636,14 @@ def render_dashboard_section():
                         padding="20px",
                         border_radius="12px",
                         background="#F1F3F4",
-                        width="600px",
+                        width="700px",
+                        flex_shrink="0",
                     ),
 
                     spacing="4",
                     align="start",
                     width="100%",
+                    overflow_x="auto",
                 ),
 
                 spacing="4",

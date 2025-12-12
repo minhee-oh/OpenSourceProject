@@ -278,10 +278,10 @@ def intro_page():
                 justify="between",
             ),
 
-            # 시작하기 버튼 (화면 하단)
+            # 기록하기 버튼 (화면 하단)
             rx.box(
                 rx.button(
-                    "시작하기",
+                    "기록하기",
                     on_click=rx.redirect("/input/transportation"),
                     color="#FFFFFF",
                     background_color="#4DAB75",
