@@ -33,7 +33,7 @@ app.add_page(
     info_page,
     route="/info",
     title="EcoJourney | 정보글",
-    on_load=[AppState.hydrate_auth, AppState.load_active_challenges, AppState.load_daily_content],
+    on_load=[AppState.hydrate_auth, AppState.load_active_challenges, AppState.load_daily_content, AppState.load_quiz_state],
 )
 
 # 2-1. 로그인/회원가입 화면 라우팅
@@ -49,7 +49,7 @@ app.add_page(water_page, route="/input/water", title="EcoJourney | 물", on_load
 
 
 # 4. 결과 리포트 화면 라우팅
-app.add_page(report_page, route="/report", title="EcoJourney | 결과 리포트", on_load=AppState.hydrate_auth)
+app.add_page(report_page, route="/report", title="EcoJourney | 결과 리포트", on_load=[AppState.hydrate_auth, AppState.on_report_page_load])
 
 # 5. 마이페이지 라우팅
 app.add_page(mypage_page, route="/mypage", title="EcoJourney | 마이페이지", on_load=[AppState.hydrate_auth, AppState.load_mypage_data])

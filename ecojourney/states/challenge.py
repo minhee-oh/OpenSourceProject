@@ -39,7 +39,7 @@ class ChallengeState(MileageState):
     weekly_daily_data: List[Dict[str, Any]] = []  # 이번주 일별 배출량 데이터
     monthly_daily_data: List[Dict[str, Any]] = []  # 한달 일별 배출량 데이터
     
-    async def ensure_default_challenges(self):
+    def ensure_default_challenges(self):
         """필수 기본 챌린지(주간/일일) 생성"""
         try:
             from sqlmodel import Session, create_engine, select
@@ -52,7 +52,7 @@ class ChallengeState(MileageState):
             # 보상/목표 기본값 정의
             default_challenges = [
                 {"title": "7일 연속 기록", "type": "WEEKLY_STREAK", "goal_value": 7, "reward_points": 10},
-                {"title": "정보 글 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 1},
+                {"title": "아티클 읽기", "type": "DAILY_INFO", "goal_value": 1, "reward_points": 1},
                 {"title": "OX 퀴즈 풀기", "type": "DAILY_QUIZ", "goal_value": 1, "reward_points": 1},
             ]
 
@@ -94,10 +94,10 @@ class ChallengeState(MileageState):
         except Exception as e:
             logger.error(f"기본 챌린지 생성 오류: {e}", exc_info=True)
 
-    async def load_active_challenges(self):
+    def load_active_challenges(self):
         """활성화된 챌린지 목록 로드"""
         try:
-            await self.ensure_default_challenges()
+            self.ensure_default_challenges()
 
             from sqlmodel import Session, create_engine, select
             import os
@@ -336,15 +336,15 @@ class ChallengeState(MileageState):
         except Exception as e:
             logger.error(f"챌린지 진행도 업데이트 오류: {e}")
     
-    async def load_user_challenge_progress(self):
+    def load_user_challenge_progress(self):
         """사용자의 챌린지 진행도 로드"""
         if not self.is_logged_in or not self.current_user_id:
             self.user_challenge_progress = []
             return
-        
+
         try:
             # 활성화된 챌린지 로드
-            await self.load_active_challenges()
+            self.load_active_challenges()
             
             # 사용자의 진행도 조회 (SQLModel Session 직접 사용)
             from sqlmodel import Session, create_engine, select
@@ -433,19 +433,26 @@ class ChallengeState(MileageState):
         if not self.is_logged_in:
             self.challenge_message = "로그인 후 이용해주세요."
             return
+
+        # 이미 오늘 읽었으면 무시
+        if self.article_read_today:
+            self.challenge_message = "오늘 이미 아티클을 읽었습니다. 내일 다시 도전해주세요!"
+            return
+
         self.challenge_message = ""
         try:
-            await self.ensure_default_challenges()
-            await self.load_active_challenges()
+            self.ensure_default_challenges()
+            self.load_active_challenges()
             challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_INFO"), None)
             if not challenge:
                 self.challenge_message = "챌린지를 불러올 수 없습니다."
                 return
             await self.update_challenge_progress(challenge["id"], 1)
-            self.challenge_message = "정보 글 읽기 완료! 포인트가 적립됩니다."
-            await self.load_user_challenge_progress()
+            self.article_read_today = True  # 상태 업데이트
+            self.challenge_message = "아티클 읽기 완료! 포인트가 적립됩니다."
+            self.load_user_challenge_progress()
         except Exception as e:
-            self.challenge_message = f"정보 글 읽기 처리 중 오류: {e}"
+            self.challenge_message = f"아티클 읽기 처리 중 오류: {e}"
             logger.error(self.challenge_message, exc_info=True)
 
     async def _complete_daily_quiz_with_answer(self, is_correct: bool):
@@ -466,15 +473,15 @@ class ChallengeState(MileageState):
                 self.challenge_message = "틀렸습니다. 다시 시도해주세요."
                 return
             
-            await self.ensure_default_challenges()
-            await self.load_active_challenges()
+            self.ensure_default_challenges()
+            self.load_active_challenges()
             challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_QUIZ"), None)
             if not challenge:
                 self.challenge_message = "챌린지를 불러올 수 없습니다."
                 return
             await self.update_challenge_progress(challenge["id"], 1)
-            self.challenge_message = "OX 퀴즈 완료! 포인트가 적립됩니다."
-            await self.load_user_challenge_progress()
+            self.challenge_message = "정답입니다! OX 퀴즈 완료! 포인트가 적립되었습니다."
+            self.load_user_challenge_progress()
         except Exception as e:
             self.challenge_message = f"OX 퀴즈 처리 중 오류: {e}"
             logger.error(self.challenge_message, exc_info=True)
@@ -487,6 +494,10 @@ class ChallengeState(MileageState):
         """일일 챌린지 - OX 퀴즈 X 버튼 클릭 처리"""
         await self._complete_daily_quiz_with_answer(False)
 
+    async def complete_daily_quiz(self):
+        """일일 챌린지 - 정답 처리 (기존 API 호환용)"""
+        await self._complete_daily_quiz_with_answer(True)
+
     async def mark_daily_record(self):
         """주간 챌린지 - 7일 연속 기록 진행도 업데이트"""
         print(f"[주간 챌린지] mark_daily_record 호출됨, 로그인: {self.is_logged_in}, 사용자: {self.current_user_id}")
@@ -498,9 +509,9 @@ class ChallengeState(MileageState):
         
         try:
             print("[주간 챌린지] 기본 챌린지 확인 중...")
-            await self.ensure_default_challenges()
+            self.ensure_default_challenges()
             print("[주간 챌린지] 활성 챌린지 로드 중...")
-            await self.load_active_challenges()
+            self.load_active_challenges()
             print(f"[주간 챌린지] 활성 챌린지 개수: {len(self.active_challenges)}")
             
             challenge = next((c for c in self.active_challenges if c["type"] == "WEEKLY_STREAK"), None)
@@ -524,54 +535,104 @@ class ChallengeState(MileageState):
     
     # 포인트 로그 관련 변수
     points_log: List[Dict[str, Any]] = []
+    displayed_points_log: List[Dict[str, Any]] = []  # 화면에 표시할 포인트 로그
+    points_log_display_limit: int = 10  # 표시할 포인트 로그 개수
     
-    async def load_points_log(self):
-        """포인트 획득 내역 로드 (탄소 입력/챌린지 모두 포함)"""
+    def load_more_points_log(self):
+        """포인트 로그 더보기 (10개씩 추가)"""
+        self.points_log_display_limit += 10
+        # 표시할 로그 업데이트 (양수/음수 모두 포함)
+        self.displayed_points_log = self.points_log[:self.points_log_display_limit] if self.points_log else []
+    
+    def load_points_log(self):
+        """포인트 변동 내역 로드 (획득/차감 모두 포함)"""
         if not self.is_logged_in or not self.current_user_id:
             self.points_log = []
             return
-        
+
         try:
-            from ..models import CarbonLog
-            from sqlmodel import Session, create_engine, select
+            from ..models import CarbonLog, PointsLog
+            from sqlmodel import Session, create_engine, select, desc, union_all
+            from sqlalchemy import text
             import os
-            
+
             db_path = os.path.join(os.getcwd(), "reflex.db")
             db_url = f"sqlite:///{db_path}"
             engine = create_engine(db_url, echo=False)
-            
+
             with Session(engine) as session:
-                # 포인트가 0보다 큰 로그만 조회 (포인트가 있는 기록만 표시)
-                stmt = select(CarbonLog).where(
-                    CarbonLog.student_id == self.current_user_id,
-                    CarbonLog.points_earned > 0
-                ).order_by(CarbonLog.log_date.desc(), CarbonLog.created_at.desc())
-                
-                logger.info(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                print(f"[포인트 로그] 조회 조건: student_id={self.current_user_id}, points_earned > 0")
-                
-                logs = session.exec(stmt).all()
-                print(f"[포인트 로그] 조회 결과: {len(logs)}개")
-                
                 result = []
-                for log in logs:
+                
+                # 1. CarbonLog에서 포인트 획득 내역 (양수만)
+                carbon_logs = session.exec(
+                    select(CarbonLog).where(
+                        CarbonLog.student_id == self.current_user_id,
+                        CarbonLog.points_earned > 0
+                    ).order_by(desc(CarbonLog.log_date), desc(CarbonLog.created_at))
+                ).all()
+                
+                for log in carbon_logs:
                     source = getattr(log, "source", None) or "carbon_input"
                     description = "탄소배출 기록" if source == "carbon_input" else "챌린지 보상"
-                    # ai_feedback에 챌린지 제목이 들어있으면 함께 표시
                     if log.ai_feedback:
                         description = log.ai_feedback
+                    points = log.points_earned
                     result.append({
                         "date": log.log_date.strftime("%Y-%m-%d") if log.log_date else "",
-                        "points": log.points_earned,
+                        "points": points,
+                        "is_positive": True,  # CarbonLog는 항상 양수
                         "source": source,
-                        "description": description
+                        "description": description,
+                        "created_at": log.created_at if hasattr(log, "created_at") else None
                     })
-                    print(f"[포인트 로그] 날짜: {log.log_date}, 포인트: {log.points_earned}점, 출처: {source}")
+                
+                # 2. PointsLog에서 모든 포인트 변동 내역 (양수/음수 모두)
+                points_logs = session.exec(
+                    select(PointsLog).where(
+                        PointsLog.student_id == self.current_user_id
+                    ).order_by(desc(PointsLog.created_at))
+                ).all()
+                
+                for log in points_logs:
+                    points = log.points
+                    # 양수/음수 모두 포함 (0은 제외하지 않음)
+                    result.append({
+                        "date": log.log_date.strftime("%Y-%m-%d") if log.log_date else (log.created_at.strftime("%Y-%m-%d") if hasattr(log, "created_at") and log.created_at else ""),
+                        "points": points,
+                        "is_positive": points > 0,  # 양수/음수 플래그
+                        "source": log.source,
+                        "description": log.description or log.source or "포인트 변동",
+                        "created_at": log.created_at if hasattr(log, "created_at") else None
+                    })
+                
+                # 3. 마일리지 환산 내역 (포인트 차감)
+                from ..models import MileageRequest
+                mileage_requests = session.exec(
+                    select(MileageRequest).where(
+                        MileageRequest.student_id == self.current_user_id,
+                        MileageRequest.status == "APPROVED"
+                    ).order_by(desc(MileageRequest.processed_at))
+                ).all()
+                
+                for req in mileage_requests:
+                    points = -req.request_points  # 음수로 표시
+                    result.append({
+                        "date": req.processed_at.strftime("%Y-%m-%d") if req.processed_at else "",
+                        "points": points,
+                        "is_positive": False,  # 마일리지 환산은 항상 음수
+                        "source": "mileage_conversion",
+                        "description": f"마일리지 환산 ({req.request_points}점 → {req.converted_mileage} 마일리지)",
+                        "created_at": req.processed_at if req.processed_at else None
+                    })
+                
+                # created_at 기준으로 정렬 (최신순)
+                result.sort(key=lambda x: x.get("created_at") or datetime.min, reverse=True)
                 
                 self.points_log = result
-                logger.info(f"포인트 로그 로드 완료: {len(result)}개")
-                print(f"[포인트 로그] 최종 결과: {len(result)}개")
-                
+                # 초기 표시 로그 설정 (최근 10개)
+                self.points_log_display_limit = 10
+                self.displayed_points_log = result[:10] if result else []
+
         except Exception as e:
             logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
             self.points_log = []
@@ -582,8 +643,8 @@ class ChallengeState(MileageState):
             return
         
         try:
-            # 사용자 포인트 정보 새로고침
-            from ..models import User
+            # 사용자 포인트 정보 새로고침 - 모든 포인트 로그를 합산하여 총 포인트 계산
+            from ..models import User, CarbonLog, PointsLog, MileageRequest
             from sqlmodel import Session, create_engine, select
             import os
             
@@ -595,20 +656,76 @@ class ChallengeState(MileageState):
                 user_stmt = select(User).where(User.student_id == self.current_user_id)
                 user = session.exec(user_stmt).first()
                 if user:
-                    self.current_user_points = user.current_points
-                    logger.info(f"[마이페이지] 사용자 포인트 새로고침: {self.current_user_points}점")
+                    # 포인트 로그를 합산하여 총 포인트 계산
+                    total_points = 0
+                    
+                    # 1. CarbonLog에서 획득한 포인트 합산
+                    carbon_logs = session.exec(
+                        select(CarbonLog).where(
+                            CarbonLog.student_id == self.current_user_id,
+                            CarbonLog.points_earned > 0
+                        )
+                    ).all()
+                    for log in carbon_logs:
+                        total_points += log.points_earned
+                    
+                    # 2. PointsLog에서 모든 포인트 변동 합산
+                    points_logs = session.exec(
+                        select(PointsLog).where(
+                            PointsLog.student_id == self.current_user_id
+                        )
+                    ).all()
+                    for log in points_logs:
+                        total_points += log.points
+                    
+                    # 3. 마일리지 환산으로 차감된 포인트 빼기
+                    mileage_requests = session.exec(
+                        select(MileageRequest).where(
+                            MileageRequest.student_id == self.current_user_id,
+                            MileageRequest.status == "APPROVED"
+                        )
+                    ).all()
+                    for req in mileage_requests:
+                        total_points -= req.request_points
+                    
+                    # 계산된 총 포인트를 사용자 포인트로 설정
+                    self.current_user_points = max(0, total_points)  # 음수 방지
+                    
+                    # DB의 current_points도 업데이트 (동기화)
+                    if user.current_points != self.current_user_points:
+                        user.current_points = self.current_user_points
+                        session.add(user)
+                        session.commit()
+                        logger.info(f"[마이페이지] 포인트 동기화: DB {user.current_points} -> 계산된 {self.current_user_points}")
         except Exception as e:
             logger.error(f"사용자 포인트 새로고침 오류: {e}", exc_info=True)
+            # 오류 발생 시 DB 값 사용
+            try:
+                from ..models import User
+                from sqlmodel import Session, create_engine, select
+                import os
+                
+                db_path = os.path.join(os.getcwd(), "reflex.db")
+                db_url = f"sqlite:///{db_path}"
+                engine = create_engine(db_url, echo=False)
+                
+                with Session(engine) as session:
+                    user_stmt = select(User).where(User.student_id == self.current_user_id)
+                    user = session.exec(user_stmt).first()
+                    if user:
+                        self.current_user_points = user.current_points
+            except:
+                pass
         
         try:
             # 챌린지 진행도 로드
-            await self.load_user_challenge_progress()
+            self.load_user_challenge_progress()
         except Exception as e:
             logger.error(f"챌린지 진행도 로드 오류: {e}", exc_info=True)
         
         try:
             # 마일리지 환산 내역 로드
-            await self.load_mileage_conversion_logs()
+            self.load_mileage_conversion_logs()
         except Exception as e:
             logger.error(f"마일리지 환산 내역 로드 오류: {e}", exc_info=True)
         
@@ -631,22 +748,20 @@ class ChallengeState(MileageState):
         
         try:
             # 포인트 로그 로드
-            await self.load_points_log()
+            self.load_points_log()
         except Exception as e:
             logger.error(f"포인트 로그 로드 오류: {e}", exc_info=True)
             self.points_log = []
         
         try:
             # 대시보드 통계 로드 (이번주/한달 배출량)
-            await self.load_dashboard_statistics()
+            self.load_dashboard_statistics()
         except Exception as e:
             logger.error(f"대시보드 통계 로드 오류: {e}", exc_info=True)
             self.weekly_emission = 0.0
             self.monthly_emission = 0.0
             self.weekly_daily_data = []
             self.monthly_daily_data = []
-        
-        logger.info(f"마이페이지 데이터 로드 완료: {self.current_user_id}, 포인트: {self.current_user_points}점")
     
     async def save_carbon_log_to_db(self):
         """탄소 로그 저장 후 주간 챌린지 진행도 업데이트"""
@@ -664,7 +779,7 @@ class ChallengeState(MileageState):
                 print(f"[ChallengeState] 주간 챌린지 업데이트 실패: {e}")
                 logger.warning(f"[ChallengeState] 주간 챌린지 업데이트 실패: {e}", exc_info=True)
     
-    async def load_dashboard_statistics(self):
+    def load_dashboard_statistics(self):
         """대시보드 통계 데이터 로드 (이번주/한달 배출량)"""
         if not self.is_logged_in or not self.current_user_id:
             self.weekly_emission = 0.0
@@ -719,19 +834,24 @@ class ChallengeState(MileageState):
             # 이번주 최대 배출량 계산 (그래프 높이 정규화용)
             max_weekly_emission = max(weekly_daily_dict.values()) if weekly_daily_dict else 1.0
             
-            # 이번주 모든 날짜 채우기 (월요일부터 오늘까지)
+            # 이번주 모든 날짜 채우기 (월요일부터 일요일까지 7일 모두)
             self.weekly_daily_data = []
+            # 이번주 일요일 계산
+            this_sunday = this_monday + timedelta(days=6)
             for i in range(7):
                 current_date = this_monday + timedelta(days=i)
-                if current_date > today:
-                    break
                 day_key = current_date.strftime("%Y-%m-%d")
                 day_name = ["월", "화", "수", "목", "금", "토", "일"][current_date.weekday()]
-                emission = round(weekly_daily_dict.get(day_key, 0.0), 2)
+                # 오늘 이후 날짜는 배출량을 0으로 설정
+                if current_date > today:
+                    emission = 0.0
+                    has_emission = False
+                else:
+                    emission = round(weekly_daily_dict.get(day_key, 0.0), 2)
+                    has_emission = emission > 0.0
                 # 그래프 높이 계산 (최대 200px, 최소 4px)
                 height_percent = (emission / max_weekly_emission * 100) if max_weekly_emission > 0 else 0
                 bar_height = max(4, min(200, int(height_percent * 2)))
-                has_emission = emission > 0.0
                 self.weekly_daily_data.append({
                     "date": day_key,
                     "day": day_name,
@@ -753,6 +873,128 @@ class ChallengeState(MileageState):
             
             # 한달 최대 배출량 계산 (그래프 높이 정규화용)
             max_monthly_emission = max(monthly_daily_dict.values()) if monthly_daily_dict else 1.0
+            
+            # 데이터가 없으면 더미 데이터를 DB에 생성
+            if len(monthly_logs) == 0:
+                # 기존 더미 데이터 삭제
+                self.delete_dummy_data()
+                
+                import random
+                import json
+                with Session(engine) as session:
+                    # 사용자 조회 (한 번만)
+                    user = session.exec(
+                        select(User).where(User.student_id == self.current_user_id)
+                    ).first()
+                    
+                    if not user:
+                        logger.error(f"[더미 데이터] 사용자를 찾을 수 없습니다: {self.current_user_id}")
+                        return
+                    
+                    total_points = 0
+                    # 최근 30일 동안의 더미 데이터 생성 (다양한 패턴으로)
+                    base_emission = 10.0  # 기본 배출량
+                    for i in range(30):
+                        current_date = one_month_ago + timedelta(days=i)
+                        if current_date > today:
+                            break
+                        
+                        # 주기적인 패턴 추가 (주간 패턴)
+                        day_of_week = current_date.weekday()
+                        weekday_factor = 1.0 if day_of_week < 5 else 0.7  # 주말은 30% 감소
+                        
+                        # 장기 트렌드 추가 (시간에 따른 변화)
+                        trend_factor = 1.0 + (i / 30.0) * 0.3  # 점진적 증가
+                        
+                        # 랜덤 변동 추가 (일일 변동)
+                        random_variation = random.uniform(0.7, 1.3)
+                        
+                        # 주기적인 피크 추가 (일부 날짜에 높은 값)
+                        peak_factor = 1.0
+                        if i % 7 == 3:  # 목요일마다 약간 높게
+                            peak_factor = 1.2
+                        elif i % 10 == 0:  # 10일마다 한 번씩 매우 높게
+                            peak_factor = 1.5
+                        elif i % 5 == 2:  # 5일마다 한 번씩 낮게
+                            peak_factor = 0.6
+                        
+                        # 최종 배출량 계산
+                        emission = round(base_emission * weekday_factor * trend_factor * random_variation * peak_factor, 2)
+                        # 범위 제한 (3~25kg)
+                        emission = max(3.0, min(25.0, emission))
+                        
+                        # 더미 포인트 생성 (배출량에 비례하되 변동 추가)
+                        points = random.randint(50, 200)
+                        total_points += points
+                        
+                        # 더미 활동 데이터 생성
+                        dummy_activities = [
+                            {"category": "교통", "activity_type": "자동차", "value": random.uniform(10, 50), "unit": "km"},
+                            {"category": "식품", "activity_type": "소고기", "value": random.uniform(100, 300), "unit": "g"},
+                        ]
+                        
+                        # CarbonLog 생성
+                        dummy_log = CarbonLog(
+                            student_id=self.current_user_id,
+                            log_date=current_date,
+                            total_emission=emission,
+                            points_earned=points,
+                            activities_json=json.dumps(dummy_activities, ensure_ascii=False),
+                            source="carbon_input",
+                            created_at=datetime.now()
+                        )
+                        session.add(dummy_log)
+                    
+                    # 사용자 포인트 업데이트 (한 번만)
+                    user.current_points += total_points
+                    session.add(user)
+                    self.current_user_points = user.current_points
+                    
+                    session.commit()
+                    logger.info(f"[더미 데이터] {self.current_user_id} 사용자를 위한 더미 데이터 생성 완료 (총 {total_points}점 추가)")
+                    logger.info(f"[더미 데이터] {self.current_user_id} 사용자를 위한 더미 데이터 생성 완료")
+                    
+                    # 생성된 데이터 다시 조회
+                    monthly_stmt = select(CarbonLog).where(
+                        CarbonLog.student_id == self.current_user_id,
+                        CarbonLog.log_date >= one_month_ago,
+                        CarbonLog.log_date <= today
+                    )
+                    monthly_logs = list(session.exec(monthly_stmt).all())
+                    
+                    # 이번주 로그도 다시 조회
+                    weekly_stmt = select(CarbonLog).where(
+                        CarbonLog.student_id == self.current_user_id,
+                        CarbonLog.log_date >= this_monday,
+                        CarbonLog.log_date <= today
+                    )
+                    weekly_logs = list(session.exec(weekly_stmt).all())
+                    
+                    # weekly_daily_dict 재계산
+                    weekly_daily_dict = {}
+                    for log in weekly_logs:
+                        day_key = log.log_date.strftime("%Y-%m-%d")
+                        if day_key not in weekly_daily_dict:
+                            weekly_daily_dict[day_key] = 0.0
+                        weekly_daily_dict[day_key] += log.total_emission
+                    
+                    # monthly_daily_dict 재계산
+                    monthly_daily_dict = {}
+                    for log in monthly_logs:
+                        day_key = log.log_date.strftime("%Y-%m-%d")
+                        if day_key not in monthly_daily_dict:
+                            monthly_daily_dict[day_key] = 0.0
+                        monthly_daily_dict[day_key] += log.total_emission
+                    
+                    # 한달 최대 배출량 재계산
+                    max_monthly_emission = max(monthly_daily_dict.values()) if monthly_daily_dict else 1.0
+                    
+                    # 이번주 최대 배출량 재계산
+                    max_weekly_emission = max(weekly_daily_dict.values()) if weekly_daily_dict else 1.0
+                    
+                    # 이번주 통계 재계산
+                    self.weekly_emission = round(sum(log.total_emission for log in weekly_logs), 2)
+                    self.monthly_emission = round(sum(log.total_emission for log in monthly_logs), 2)
             
             # 한달 일별 데이터 생성 (날짜순으로 정렬)
             self.monthly_daily_data = []
@@ -777,8 +1019,9 @@ class ChallengeState(MileageState):
                     "has_emission": has_emission
                 })
             
-            logger.info(f"대시보드 통계 로드 완료: 이번주 {self.weekly_emission}kg, 한달 {self.monthly_emission}kg")
-            
+            # 꺽은선 그래프 SVG 생성
+            self._generate_monthly_line_chart_svg()
+
         except Exception as e:
             logger.error(f"대시보드 통계 로드 오류: {e}", exc_info=True)
             self.weekly_emission = 0.0
@@ -786,5 +1029,252 @@ class ChallengeState(MileageState):
             self.weekly_daily_data = []
             self.monthly_daily_data = []
 
+    mypage_section: str = "points"  # 기본값은 "내 포인트"
+    
+    monthly_line_chart_svg: str = ""  # 한달 꺽은선 그래프 SVG
 
+    def set_mypage_section(self, section: str):
+        self.mypage_section = section
+    
+    def delete_dummy_data(self):
+        """더미 데이터 삭제"""
+        if not self.is_logged_in or not self.current_user_id:
+            logger.warning("[더미 데이터 삭제] 로그인되지 않았습니다.")
+            return
+        
+        try:
+            from ..models import CarbonLog
+            from sqlmodel import Session, create_engine, select
+            import os
+            
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+            
+            with Session(engine) as session:
+                # 최근 30일 이내의 더미 데이터 삭제
+                today = date.today()
+                one_month_ago = today - timedelta(days=30)
+                
+                # 더미 데이터 조회 (source="carbon_input"이고 최근 30일 이내)
+                stmt = select(CarbonLog).where(
+                    CarbonLog.student_id == self.current_user_id,
+                    CarbonLog.log_date >= one_month_ago,
+                    CarbonLog.log_date <= today,
+                    CarbonLog.source == "carbon_input"
+                )
+                dummy_logs = list(session.exec(stmt).all())
+                
+                if len(dummy_logs) == 0:
+                    logger.info(f"[더미 데이터 삭제] 삭제할 더미 데이터가 없습니다: {self.current_user_id}")
+                    return
+                
+                # 포인트 차감 계산
+                total_points_to_deduct = sum(log.points_earned for log in dummy_logs)
+                
+                # 더미 데이터 삭제
+                for log in dummy_logs:
+                    session.delete(log)
+                
+                # 사용자 포인트 차감
+                user = session.exec(
+                    select(User).where(User.student_id == self.current_user_id)
+                ).first()
+                if user:
+                    user.current_points = max(0, user.current_points - total_points_to_deduct)
+                    self.current_user_points = user.current_points
+                    session.add(user)
+                
+                session.commit()
+                logger.info(f"[더미 데이터 삭제] {len(dummy_logs)}개의 더미 데이터 삭제 완료 (차감된 포인트: {total_points_to_deduct}점)")
+                
+        except Exception as e:
+            logger.error(f"[더미 데이터 삭제] 오류: {e}", exc_info=True)
+    
+    def _generate_monthly_line_chart_svg(self):
+        """한달 꺽은선 그래프 SVG 생성"""
+        try:
+            if not self.monthly_daily_data or len(self.monthly_daily_data) == 0:
+                self.monthly_line_chart_svg = ""
+                return
+            
+            width = 800
+            height = 200
+            padding = {"top": 20, "right": 20, "bottom": 30, "left": 40}
+            chart_width = width - padding["left"] - padding["right"]
+            chart_height = height - padding["top"] - padding["bottom"]
+            
+            # 최대값 계산
+            max_emission = max([d.get("emission", 0) for d in self.monthly_daily_data], default=1.0)
+            if max_emission == 0:
+                max_emission = 1.0
+            
+            # 포인트 계산
+            points = []
+            for i, day_data in enumerate(self.monthly_daily_data):
+                x = (i / (len(self.monthly_daily_data) - 1)) * chart_width if len(self.monthly_daily_data) > 1 else 0
+                y = chart_height - ((day_data.get("emission", 0) / max_emission) * chart_height)
+                points.append({"x": x, "y": y})
+            
+            # SVG 생성
+            svg_parts = []
+            svg_parts.append(f'<svg width="{width}" height="{height}" style="overflow: visible;">')
+            svg_parts.append('<defs>')
+            svg_parts.append('<linearGradient id="monthlyLineGradient" x1="0%" y1="0%" x2="0%" y2="100%">')
+            svg_parts.append('<stop offset="0%" style="stop-color:#2196F3;stop-opacity:0.3" />')
+            svg_parts.append('<stop offset="100%" style="stop-color:#64B5F6;stop-opacity:0.1" />')
+            svg_parts.append('</linearGradient>')
+            svg_parts.append('</defs>')
+            
+            # 그룹 생성
+            svg_parts.append(f'<g transform="translate({padding["left"]}, {padding["top"]})">')
+            
+            # 영역 채우기 (그라디언트)
+            if len(points) > 0:
+                area_path = f'M 0,{chart_height} L ' + ' L '.join([f'{p["x"]},{p["y"]}' for p in points]) + f' L {chart_width},{chart_height} Z'
+                svg_parts.append(f'<path d="{area_path}" fill="url(#monthlyLineGradient)" opacity="0.5"/>')
+                
+                # 선 그리기
+                line_path = 'M ' + ' L '.join([f'{p["x"]},{p["y"]}' for p in points])
+                svg_parts.append(f'<path d="{line_path}" fill="none" stroke="#2196F3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>')
+                
+                # 점 그리기
+                for i, point in enumerate(points):
+                    if self.monthly_daily_data[i].get("has_emission", False):
+                        svg_parts.append(f'<circle cx="{point["x"]}" cy="{point["y"]}" r="4" fill="#2196F3" stroke="#fff" stroke-width="2"/>')
+            
+            svg_parts.append('</g>')
+            svg_parts.append('</svg>')
+            
+            self.monthly_line_chart_svg = ''.join(svg_parts)
+            
+        except Exception as e:
+            logger.error(f"한달 꺽은선 그래프 SVG 생성 오류: {e}", exc_info=True)
+            self.monthly_line_chart_svg = ""
+
+    article_modal_open: bool = False
+    article_detail: dict = {}
+
+    # 퀴즈 상태 변수
+    quiz_answered: bool = False  # 오늘 퀴즈를 풀었는지 여부
+    quiz_is_correct: bool = False  # 정답 여부
+
+    # 아티클 상태 변수
+    article_read_today: bool = False  # 오늘 아티클을 읽었는지 여부
+
+    def open_article(self, article: dict):
+        self.article_detail = article
+        self.article_modal_open = True
+
+    def close_article(self):
+        self.article_modal_open = False
+
+    async def load_quiz_state(self):
+        """퀴즈 및 아티클 상태 로드 (오늘 이미 완료했는지 확인)"""
+        if not self.is_logged_in or not self.current_user_id:
+            self.quiz_answered = False
+            self.quiz_is_correct = False
+            self.article_read_today = False
+            return
+
+        try:
+            from sqlmodel import Session, create_engine, select
+            import os
+
+            db_path = os.path.join(os.getcwd(), "reflex.db")
+            db_url = f"sqlite:///{db_path}"
+            engine = create_engine(db_url, echo=False)
+
+            today = date.today()
+
+            # 챌린지 로드
+            self.ensure_default_challenges()
+            self.load_active_challenges()
+
+            quiz_challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_QUIZ"), None)
+            info_challenge = next((c for c in self.active_challenges if c["type"] == "DAILY_INFO"), None)
+
+            with Session(engine) as session:
+                # DAILY_QUIZ 진행도 조회
+                if quiz_challenge:
+                    quiz_progress = session.exec(
+                        select(ChallengeProgress).where(
+                            ChallengeProgress.challenge_id == quiz_challenge["id"],
+                            ChallengeProgress.student_id == self.current_user_id
+                        )
+                    ).first()
+
+                    if quiz_progress and quiz_progress.last_updated:
+                        last_updated_date = quiz_progress.last_updated.date()
+                        if last_updated_date == today:
+                            # 오늘 날짜로 기록이 있고, 정답을 맞춘 경우에만 완료로 표시
+                            # 오답인 경우는 데이터베이스에 기록되지 않으므로, is_completed가 True인 경우만 완료로 처리
+                            if quiz_progress.is_completed:
+                                self.quiz_answered = True
+                                self.quiz_is_correct = True
+                                logger.info(f"퀴즈 상태 로드: 오늘 정답을 맞춤")
+                            else:
+                                # is_completed가 False인 경우는 오래된 기록이거나 오류 상태
+                                # 오늘 날짜지만 완료되지 않은 경우는 초기화
+                                self.quiz_answered = False
+                                self.quiz_is_correct = False
+                                logger.info(f"퀴즈 상태 로드: 오늘 날짜 기록이 있지만 완료되지 않음, 초기화")
+                        else:
+                            self.quiz_answered = False
+                            self.quiz_is_correct = False
+                    else:
+                        self.quiz_answered = False
+                        self.quiz_is_correct = False
+                else:
+                    self.quiz_answered = False
+                    self.quiz_is_correct = False
+
+                # DAILY_INFO 진행도 조회
+                if info_challenge:
+                    info_progress = session.exec(
+                        select(ChallengeProgress).where(
+                            ChallengeProgress.challenge_id == info_challenge["id"],
+                            ChallengeProgress.student_id == self.current_user_id
+                        )
+                    ).first()
+
+                    if info_progress and info_progress.last_updated:
+                        last_updated_date = info_progress.last_updated.date()
+                        if last_updated_date == today and info_progress.is_completed:
+                            self.article_read_today = True
+                            logger.info("아티클 상태 로드: 오늘 이미 읽었음")
+                        else:
+                            self.article_read_today = False
+                    else:
+                        self.article_read_today = False
+                else:
+                    self.article_read_today = False
+
+        except Exception as e:
+            logger.error(f"챌린지 상태 로드 오류: {e}", exc_info=True)
+            self.quiz_answered = False
+            self.quiz_is_correct = False
+            self.article_read_today = False
+
+    async def answer_quiz(self, is_correct: bool):
+        """퀴즈 답변 처리 (정답: True, 오답: False)"""
+        if not self.is_logged_in:
+            self.challenge_message = "로그인 후 이용해주세요."
+            return
+
+        # 이미 정답을 맞춘 경우 더 이상 진행 불가
+        if self.quiz_is_correct:
+            self.challenge_message = "오늘 퀴즈는 이미 완료했습니다."
+            return
+
+        # 정답인 경우에만 상태를 완료로 기록
+        if is_correct:
+            self.quiz_answered = True
+            self.quiz_is_correct = True
+            await self.complete_daily_quiz()
+        else:
+            # 오답은 재도전 가능하도록 상태를 유지하지 않음
+            self.quiz_answered = False
+            self.quiz_is_correct = False
+            self.challenge_message = "틀렸습니다. 다시 시도해보세요."
 

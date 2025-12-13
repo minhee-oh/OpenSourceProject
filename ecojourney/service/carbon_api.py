@@ -46,6 +46,9 @@ def _call_climatiq(activity_id: str, region: str, parameters: Dict[str, Any], da
         탄소 배출량 (kgCO2e) 또는 None (실패 시)
     """
     if not CLIMATIQ_API_KEY:
+        import sys
+        sys.stderr.write(f"[API] ❌ CLIMATIQ_API_KEY가 설정되지 않았습니다. (activity_id: {activity_id}, region: {region})\n")
+        sys.stderr.flush()
         logger.warning(f"[API] CLIMATIQ_API_KEY가 설정되지 않았습니다.")
         return None
     
@@ -65,8 +68,13 @@ def _call_climatiq(activity_id: str, region: str, parameters: Dict[str, Any], da
     }
     
     try:
+        import sys
+        sys.stderr.write(f"[API] 🌐 Climatiq API 호출 시도 - URL: {BASE_URL}, activity_id: {activity_id}, region: {region}\n")
+        sys.stderr.flush()
         # 1차 시도: 요청된 Region (예: KR)
         response = requests.post(BASE_URL, json=payload, headers=get_headers(), timeout=10)
+        sys.stderr.write(f"[API] 📡 API 응답 - 상태 코드: {response.status_code}, region: {region}\n")
+        sys.stderr.flush()
         logger.debug(f"[API] {region} 지역 시도 - 상태 코드: {response.status_code}")
         
         # 400(Bad Request) 중 'no_emission_factors_found' 에러이거나 404인 경우
@@ -97,14 +105,23 @@ def _call_climatiq(activity_id: str, region: str, parameters: Dict[str, Any], da
         else:
             co2e = co2e_value
         
-        logger.info(f"[API] ✅ 계산 성공: {co2e}kgCO2e (지역: {payload['emission_factor']['region']})")
+        import sys
+        final_region = payload['emission_factor']['region']
+        sys.stderr.write(f"[API] ✅ Climatiq API 계산 성공: {co2e}kgCO2e (지역: {final_region}, activity_id: {activity_id})\n")
+        sys.stderr.flush()
+        logger.info(f"[API] ✅ 계산 성공: {co2e}kgCO2e (지역: {final_region})")
         return co2e
         
     except requests.exceptions.RequestException as e:
+        import sys
+        sys.stderr.write(f"[API] ❌ Climatiq API 호출 실패: {activity_id} - {str(e)}\n")
+        sys.stderr.flush()
         logger.error(f"[API 오류] {activity_id} 호출 실패: {e}")
         if hasattr(e, 'response') and e.response is not None:
             try:
                 error_data = e.response.json()
+                sys.stderr.write(f"[API] ❌ API 오류 상세: {error_data}\n")
+                sys.stderr.flush()
                 logger.error(f"[API] 상세 응답: {error_data}")
             except:
                 logger.error(f"[API] 상세 응답 (텍스트): {e.response.text}")

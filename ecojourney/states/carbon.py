@@ -66,6 +66,69 @@ class CarbonState(AuthState):
     show_fruit: bool = False
     show_pasta: bool = False
     food_input_mode: bool = False
+
+    # 2단계 입력 모드 추가
+    food_step: int = 0  # 0: 카테고리 선택, 1: 세부 카테고리 선택, 2: 횟수 입력
+
+    # 선택된 세부 카테고리 저장
+    selected_dairy_subs: List[str] = []
+    selected_rice_subs: List[str] = []
+    selected_coffee_subs: List[str] = []
+    selected_fastfood_subs: List[str] = []
+    selected_noodles_subs: List[str] = []
+    selected_cooked_subs: List[str] = []
+    selected_side_dish_subs: List[str] = []
+    selected_grilled_meat_subs: List[str] = []
+    selected_fruit_subs: List[str] = []
+    selected_pasta_subs: List[str] = []
+
+    # ---------- 의류 선택 상태 ----------
+    selected_tshirts: bool = False
+    selected_jeans: bool = False
+    selected_shoes: bool = False
+    selected_acc: bool = False
+
+    show_tshirts: bool = False
+    show_jeans: bool = False
+    show_shoes: bool = False
+    show_acc: bool = False
+
+    clothing_input_mode: bool = False
+
+    # ---------- 전기 선택 상태 ----------
+    selected_ac: bool = False       # 냉방기
+    selected_heater: bool = False   # 난방기
+
+    show_ac: bool = False
+    show_heater: bool = False
+
+    electricity_input_mode: bool = False
+
+    # ---------- 쓰레기 선택 상태 ----------
+    selected_general: bool = False
+    selected_plastic: bool = False
+    selected_paper: bool = False
+    selected_glass: bool = False
+    selected_can: bool = False
+
+    show_general: bool = False
+    show_plastic: bool = False
+    show_paper: bool = False
+    show_glass: bool = False
+    show_can: bool = False
+
+    waste_input_mode: bool = False
+
+    # ---------- 물 선택 상태 ----------
+    selected_shower: bool = False
+    selected_dish: bool = False
+    selected_laundry: bool = False
+
+    show_shower: bool = False
+    show_dish: bool = False
+    show_laundry: bool = False
+
+    water_input_mode: bool = False
     
     # ------------------------------ 교통 관련 메서드 ------------------------------
     
@@ -92,9 +155,28 @@ class CarbonState(AuthState):
         self.show_walk = self.selected_walk
         self.show_bike = self.selected_bike
         self.trans_input_mode = True
+
+    def reset_transport_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.trans_input_mode = False
+        self.selected_car = False
+        self.selected_bus = False
+        self.selected_subway = False
+        self.selected_walk = False
+        self.selected_bike = False
+        self.show_car = False
+        self.show_bus = False
+        self.show_subway = False
+        self.show_walk = False
+        self.show_bike = False
     
-    def handle_transport_submit(self, form_data: dict):
+    async def handle_transport_submit(self, form_data: dict):
         """교통 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[교통 제출] handle_transport_submit 호출됨\n")
+        sys.stderr.write(f"[교통 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 교통 데이터 제거
         self.all_activities = [
             act for act in self.all_activities 
@@ -144,6 +226,11 @@ class CarbonState(AuthState):
             })
         
         self.all_activities = self.all_activities + transport_data
+        import sys
+        sys.stderr.write(f"[교통 제출] transport_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[교통 제출] transport_data: {transport_data}\n")
+        sys.stderr.write(f"[교통 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
         
         # 입력모드 종료 + 선택 초기화
         self.trans_input_mode = False
@@ -158,7 +245,7 @@ class CarbonState(AuthState):
         self.show_walk = False
         self.show_bike = False
         
-        return rx.redirect("/input/food")
+        yield rx.redirect("/input/food")
     
     # ------------------------------ 식품 관련 메서드 ------------------------------
     
@@ -193,7 +280,7 @@ class CarbonState(AuthState):
         self.selected_pasta = not self.selected_pasta
 
     def show_food_input_fields(self):
-        """선택된 음식 항목들의 입력 필드를 표시"""
+        """선택된 음식 항목들의 입력 필드를 표시 (1단계: 세부 카테고리 선택)"""
         self.show_dairy = self.selected_dairy
         self.show_rice = self.selected_rice
         self.show_coffee = self.selected_coffee
@@ -205,130 +292,68 @@ class CarbonState(AuthState):
         self.show_fruit = self.selected_fruit
         self.show_pasta = self.selected_pasta
         self.food_input_mode = True
+        self.food_step = 1  # 세부 카테고리 선택 단계로 이동
 
-    def handle_food_submit(self, form_data: dict):
-        """음식 입력값 제출 처리"""
-        # 기존 음식 데이터 제거
-        self.all_activities = [
-            act for act in self.all_activities
-            if act.get("category") != "식품"
-        ]
+    def toggle_food_subcategory(self, category: str, subcategory: str):
+        """세부 카테고리 토글 (체크박스 선택/해제)"""
+        if category == "유제품":
+            if subcategory in self.selected_dairy_subs:
+                self.selected_dairy_subs.remove(subcategory)
+            else:
+                self.selected_dairy_subs.append(subcategory)
+        elif category == "밥":
+            if subcategory in self.selected_rice_subs:
+                self.selected_rice_subs.remove(subcategory)
+            else:
+                self.selected_rice_subs.append(subcategory)
+        elif category == "커피":
+            if subcategory in self.selected_coffee_subs:
+                self.selected_coffee_subs.remove(subcategory)
+            else:
+                self.selected_coffee_subs.append(subcategory)
+        elif category == "패스트푸드":
+            if subcategory in self.selected_fastfood_subs:
+                self.selected_fastfood_subs.remove(subcategory)
+            else:
+                self.selected_fastfood_subs.append(subcategory)
+        elif category == "면":
+            if subcategory in self.selected_noodles_subs:
+                self.selected_noodles_subs.remove(subcategory)
+            else:
+                self.selected_noodles_subs.append(subcategory)
+        elif category == "국/찌개":
+            if subcategory in self.selected_cooked_subs:
+                self.selected_cooked_subs.remove(subcategory)
+            else:
+                self.selected_cooked_subs.append(subcategory)
+        elif category == "반찬":
+            if subcategory in self.selected_side_dish_subs:
+                self.selected_side_dish_subs.remove(subcategory)
+            else:
+                self.selected_side_dish_subs.append(subcategory)
+        elif category == "고기":
+            if subcategory in self.selected_grilled_meat_subs:
+                self.selected_grilled_meat_subs.remove(subcategory)
+            else:
+                self.selected_grilled_meat_subs.append(subcategory)
+        elif category == "과일":
+            if subcategory in self.selected_fruit_subs:
+                self.selected_fruit_subs.remove(subcategory)
+            else:
+                self.selected_fruit_subs.append(subcategory)
+        elif category == "파스타":
+            if subcategory in self.selected_pasta_subs:
+                self.selected_pasta_subs.remove(subcategory)
+            else:
+                self.selected_pasta_subs.append(subcategory)
 
-        food_data = []
+    def proceed_to_quantity_input(self):
+        """세부 카테고리 선택 완료 후 횟수 입력 단계로 이동"""
+        self.food_step = 2
 
-        if self.show_dairy and form_data.get("dairy_value"):
-            # 유제품류: 우유/치즈/두유를 activity_type으로 저장
-            dairy_sub = form_data.get("dairy_sub") or "우유"
-            food_data.append({
-                "category": "식품",
-                "activity_type": dairy_sub,
-                "subcategory": "유제품류",
-                "value": float(form_data.get("dairy_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_rice and form_data.get("rice_value"):
-            # 쌀밥: 세부 선택을 activity_type으로 저장
-            rice_sub = form_data.get("rice_sub") or "쌀밥"
-            food_data.append({
-                "category": "식품",
-                "activity_type": rice_sub,
-                "subcategory": "쌀밥",
-                "value": float(form_data.get("rice_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_coffee and form_data.get("coffee_value"):
-            # 커피: 한국일보 기준만 (에스프레소, 카페라떼한국)
-            coffee_sub = form_data.get("coffee_sub") or "에스프레소"
-            food_data.append({
-                "category": "식품",
-                "activity_type": coffee_sub,
-                "subcategory": "커피",
-                "value": float(form_data.get("coffee_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_fastfood and form_data.get("fastfood_value"):
-            # 패스트푸드: 한국일보 기준만 (피자, 햄버거세트, 후라이드치킨)
-            fastfood_sub = form_data.get("fastfood_sub") or "피자"
-            food_data.append({
-                "category": "식품",
-                "activity_type": fastfood_sub,
-                "subcategory": "패스트푸드",
-                "value": float(form_data.get("fastfood_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_noodles and form_data.get("noodles_value"):
-            # 면류: 한국일보 기준만 (물냉면, 비빔냉면, 잔치국수, 비빔국수, 해물칼국수)
-            noodles_sub = form_data.get("noodles_sub") or "물냉면"
-            food_data.append({
-                "category": "식품",
-                "activity_type": noodles_sub,
-                "subcategory": "면류",
-                "value": float(form_data.get("noodles_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_cooked and form_data.get("cooked_value"):
-            # 조리된 음식: 한국일보 기준만 (된장국, 미역국, 콩나물국, 된장찌개, 김치찌개, 순두부찌개, 설렁탕, 갈비탕, 곰탕)
-            cooked_sub = form_data.get("cooked_sub") or "된장국"
-            food_data.append({
-                "category": "식품",
-                "activity_type": cooked_sub,
-                "subcategory": "국/찌개",
-                "value": float(form_data.get("cooked_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_side_dish and form_data.get("side_dish_value"):
-            # 반찬: 세부 선택을 activity_type으로 저장
-            side_dish_sub = form_data.get("side_dish_sub") or "배추김치"
-            food_data.append({
-                "category": "식품",
-                "activity_type": side_dish_sub,
-                "subcategory": "반찬",
-                "value": float(form_data.get("side_dish_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_grilled_meat and form_data.get("grilled_meat_value"):
-            # 고기: 세부 선택을 activity_type으로 저장
-            grilled_meat_sub = form_data.get("grilled_meat_sub") or "소고기구이"
-            food_data.append({
-                "category": "식품",
-                "activity_type": grilled_meat_sub,
-                "subcategory": "고기",
-                "value": float(form_data.get("grilled_meat_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_fruit and form_data.get("fruit_value"):
-            # 과일: 세부 선택을 activity_type으로 저장
-            fruit_sub = form_data.get("fruit_sub") or "딸기"
-            food_data.append({
-                "category": "식품",
-                "activity_type": fruit_sub,
-                "subcategory": "과일",
-                "value": float(form_data.get("fruit_value", 0)),
-                "unit": "회",
-            })
-
-        if self.show_pasta and form_data.get("pasta_value"):
-            # 파스타: 한끼 기준 로컬 계산
-            pasta_sub = form_data.get("pasta_sub") or "카르보나라"
-            food_data.append({
-                "category": "식품",
-                "activity_type": pasta_sub,
-                "subcategory": "파스타",
-                "value": float(form_data.get("pasta_value", 0)),
-                "unit": "회",
-            })
-
-        self.all_activities = self.all_activities + food_data
-
-        # 입력모드 종료 + 선택 초기화
+    def reset_food_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.food_step = 0
         self.food_input_mode = False
         self.selected_dairy = False
         self.selected_rice = False
@@ -350,227 +375,705 @@ class CarbonState(AuthState):
         self.show_grilled_meat = False
         self.show_fruit = False
         self.show_pasta = False
+        self.selected_dairy_subs = []
+        self.selected_rice_subs = []
+        self.selected_coffee_subs = []
+        self.selected_fastfood_subs = []
+        self.selected_noodles_subs = []
+        self.selected_cooked_subs = []
+        self.selected_side_dish_subs = []
+        self.selected_grilled_meat_subs = []
+        self.selected_fruit_subs = []
+        self.selected_pasta_subs = []
 
-        return rx.redirect("/input/clothing")
+    async def handle_food_submit(self, form_data: dict):
+        """음식 입력값 제출 처리 (다중 선택 지원)"""
+        import sys
+        sys.stderr.write(f"[식품 제출] handle_food_submit 호출됨\n")
+        sys.stderr.write(f"[식품 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
+        # 기존 음식 데이터 제거
+        self.all_activities = [
+            act for act in self.all_activities 
+            if act.get("category") != "식품"
+        ]
+        
+        food_data = []
+
+        # 유제품 처리
+        if self.show_dairy:
+            for dairy_sub in self.selected_dairy_subs:
+                value_key = f"dairy_{dairy_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": dairy_sub,
+                        "subcategory": "유제품류",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 밥 처리
+        if self.show_rice:
+            for rice_sub in self.selected_rice_subs:
+                value_key = f"rice_{rice_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": rice_sub,
+                        "subcategory": "쌀밥",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 커피 처리
+        if self.show_coffee:
+            for coffee_sub in self.selected_coffee_subs:
+                value_key = f"coffee_{coffee_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": coffee_sub,
+                        "subcategory": "커피",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        if self.show_fastfood and form_data.get("fastfood_value"):
+            # 패스트푸드: 한국일보 기준만 (피자, 햄버거세트, 후라이드치킨)
+            fastfood_sub = form_data.get("fastfood_sub") or "피자"
+            food_data.append({
+                "category": "식품",
+                "activity_type": fastfood_sub,
+                "subcategory": "패스트푸드",
+                "value": float(form_data.get("fastfood_value", 0)),
+                "unit": "회",
+            })
+
+        # 면 처리
+        if self.show_noodles:
+            for noodles_sub in self.selected_noodles_subs:
+                value_key = f"noodles_{noodles_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": noodles_sub,
+                        "subcategory": "면류",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 국/찌개 처리
+        if self.show_cooked:
+            for cooked_sub in self.selected_cooked_subs:
+                value_key = f"cooked_{cooked_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": cooked_sub,
+                        "subcategory": "국/찌개",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 반찬 처리
+        if self.show_side_dish:
+            for side_dish_sub in self.selected_side_dish_subs:
+                value_key = f"side_dish_{side_dish_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": side_dish_sub,
+                        "subcategory": "반찬",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 고기 처리
+        if self.show_grilled_meat:
+            for grilled_meat_sub in self.selected_grilled_meat_subs:
+                value_key = f"grilled_meat_{grilled_meat_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": grilled_meat_sub,
+                        "subcategory": "고기",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 과일 처리
+        if self.show_fruit:
+            for fruit_sub in self.selected_fruit_subs:
+                value_key = f"fruit_{fruit_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": fruit_sub,
+                        "subcategory": "과일",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        # 파스타 처리
+        if self.show_pasta:
+            for pasta_sub in self.selected_pasta_subs:
+                value_key = f"pasta_{pasta_sub}_value"
+                if form_data.get(value_key):
+                    food_data.append({
+                        "category": "식품",
+                        "activity_type": pasta_sub,
+                        "subcategory": "파스타",
+                        "value": float(form_data.get(value_key, 0)),
+                        "unit": "회",
+                    })
+
+        self.all_activities = self.all_activities + food_data
+        import sys
+        sys.stderr.write(f"[식품 제출] food_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[식품 제출] food_data: {food_data}\n")
+        sys.stderr.write(f"[식품 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+
+        # 입력모드 종료 + 선택 초기화
+        self.food_input_mode = False
+        self.food_step = 0
+        self.selected_dairy = False
+        self.selected_rice = False
+        self.selected_coffee = False
+        self.selected_fastfood = False
+        self.selected_noodles = False
+        self.selected_cooked = False
+        self.selected_side_dish = False
+        self.selected_grilled_meat = False
+        self.selected_fruit = False
+        self.selected_pasta = False
+        self.show_dairy = False
+        self.show_rice = False
+        self.show_coffee = False
+        self.show_fastfood = False
+        self.show_noodles = False
+        self.show_cooked = False
+        self.show_side_dish = False
+        self.show_grilled_meat = False
+        self.show_fruit = False
+        self.show_pasta = False
+        self.selected_dairy_subs = []
+        self.selected_rice_subs = []
+        self.selected_coffee_subs = []
+        self.selected_fastfood_subs = []
+        self.selected_noodles_subs = []
+        self.selected_cooked_subs = []
+        self.selected_side_dish_subs = []
+        self.selected_grilled_meat_subs = []
+        self.selected_fruit_subs = []
+        self.selected_pasta_subs = []
+
+        yield rx.redirect("/input/clothing")
     
     # ------------------------------ 의류 관련 메서드 ------------------------------
     
-    # 의류 입력 상태
-    clothing_type: str = ""
-    clothing_count: float = 0.0
-    clothing_is_vintage: bool = False
+    def toggle_tshirts(self):
+        self.selected_tshirts = not self.selected_tshirts
     
-    def handle_clothing_submit(self, form_data: dict):
-        """의류 입력값 제출 처리"""
+    def toggle_jeans(self):
+        self.selected_jeans = not self.selected_jeans
+    
+    def toggle_shoes(self):
+        self.selected_shoes = not self.selected_shoes
+    
+    def toggle_acc(self):
+        self.selected_acc = not self.selected_acc
+    
+    def show_clothing_input_fields(self):
+        """선택된 항목들의 입력 필드를 표시"""
+        self.show_tshirts = self.selected_tshirts
+        self.show_jeans = self.selected_jeans
+        self.show_shoes = self.selected_shoes
+        self.show_acc = self.selected_acc
+        self.clothing_input_mode = True
+
+    def reset_clothing_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.clothing_input_mode = False
+        self.selected_tshirts = False
+        self.selected_jeans = False
+        self.selected_shoes = False
+        self.selected_acc = False
+        self.show_tshirts = False
+        self.show_jeans = False
+        self.show_shoes = False
+        self.show_acc = False
+    
+    async def handle_clothing_submit(self, form_data: dict):
+        """의류 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[의류 제출] handle_clothing_submit 호출됨\n")
+        sys.stderr.write(f"[의류 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 의류 데이터 제거
         self.all_activities = [
-            act for act in self.all_activities
+            act for act in self.all_activities 
             if act.get("category") != "의류"
         ]
-
-        clothing_items = []
-
-        # 여러 종류를 한 번에 입력할 수 있도록 처리
-        mapping = [
-            ("상의", "top_count", "top_vintage"),
-            ("하의", "bottom_count", "bottom_vintage"),
-            ("신발", "shoes_count", "shoes_vintage"),
-            ("가방/잡화", "bag_count", "bag_vintage"),
-        ]
-
-        for label, count_field, vintage_field in mapping:
-            value_str = form_data.get(count_field)
-            if value_str:
-                try:
-                    value = float(value_str)
-                except ValueError:
-                    continue
-                if value > 0:
-                    # 새제품/빈티지 선택 (기본값: 새제품)
-                    vintage_selection = form_data.get(vintage_field, "새제품")
-                    sub_category = "빈티지" if vintage_selection == "빈티지" else "새제품"
-                    
-                    clothing_items.append({
-                        "category": "의류",
-                        "activity_type": label,
-                        "value": value,
-                        "unit": "개",
-                        "sub_category": sub_category,
-                    })
-
-        if clothing_items:
-            self.all_activities = self.all_activities + clothing_items
         
-        # 폼 초기화
-        self.clothing_type = ""
-        self.clothing_count = 0.0
-        self.clothing_is_vintage = False
+        clothing_data = []
         
-        return rx.redirect("/input/electricity")
+        if self.show_tshirts and form_data.get("tshirts_value"):
+            clothing_data.append({
+                "category": "의류",
+                "activity_type": "티셔츠",
+                "value": float(form_data.get("tshirts_value", 0)),
+                "sub_category": form_data.get("tshirts_sub", ""),
+            })
+        
+        if self.show_jeans and form_data.get("jeans_value"):
+            clothing_data.append({
+                "category": "의류",
+                "activity_type": "청바지",
+                "value": float(form_data.get("jeans_value", 0)),
+                "sub_category": form_data.get("jeans_sub", ""),
+            })
+        
+        if self.show_shoes and form_data.get("shoes_value"):
+            clothing_data.append({
+                "category": "의류",
+                "activity_type": "신발",
+                "value": float(form_data.get("shoes_value", 0)),
+                "sub_category": form_data.get("shoes_sub", ""),
+            })
+        
+        if self.show_acc and form_data.get("acc_value"):
+            clothing_data.append({
+                "category": "의류",
+                "activity_type": "가방/잡화",
+                "value": float(form_data.get("acc_value", 0)),
+                "sub_category": form_data.get("acc_sub", ""),
+            })
+        
+        self.all_activities = self.all_activities + clothing_data
+        import sys
+        sys.stderr.write(f"[의류 제출] clothing_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[의류 제출] clothing_data: {clothing_data}\n")
+        sys.stderr.write(f"[의류 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.clothing_input_mode = False
+        self.selected_tshirts = False
+        self.selected_jeans = False
+        self.selected_shoes = False
+        self.selected_acc = False
+        self.show_tshirts = False
+        self.show_jeans = False
+        self.show_shoes = False
+        self.show_acc = False
+        
+        yield rx.redirect("/input/electricity")
     
     # ------------------------------ 전기 관련 메서드 ------------------------------
     
-    # 전기 입력 상태
-    electricity_type: str = ""
-    electricity_hours: float = 0.0
+    def toggle_ac(self):
+        self.selected_ac = not self.selected_ac
     
-    def handle_electricity_submit(self, form_data: dict):
-        """전기 입력값 제출 처리"""
+    def toggle_heater(self):
+        self.selected_heater = not self.selected_heater
+    
+    def show_electricity_input_fields(self):
+        """선택된 항목들의 입력 필드를 표시"""
+        self.show_ac = self.selected_ac
+        self.show_heater = self.selected_heater
+        self.electricity_input_mode = True
+
+    def reset_electricity_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.electricity_input_mode = False
+        self.selected_ac = False
+        self.selected_heater = False
+        self.show_ac = False
+        self.show_heater = False
+    
+    async def handle_electricity_submit(self, form_data: dict):
+        """전기 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[전기 제출] handle_electricity_submit 호출됨\n")
+        sys.stderr.write(f"[전기 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 전기 데이터 제거
         self.all_activities = [
-            act for act in self.all_activities
+            act for act in self.all_activities 
             if act.get("category") != "전기"
         ]
-
-        electricity_items = []
-
-        # 냉방기 / 난방기를 한 번에 입력
-        cooling = form_data.get("cooling_hours")
-        heating = form_data.get("heating_hours")
-
-        if cooling:
-            try:
-                v = float(cooling)
-                if v > 0:
-                    electricity_items.append({
-                        "category": "전기",
-                        "activity_type": "냉방기",
-                        "value": v,
-                        "unit": "시간",
-                    })
-            except ValueError:
-                pass
-
-        if heating:
-            try:
-                v = float(heating)
-                if v > 0:
-                    electricity_items.append({
-                        "category": "전기",
-                        "activity_type": "난방기",
-                        "value": v,
-                        "unit": "시간",
-                    })
-            except ValueError:
-                pass
-
-        if electricity_items:
-            self.all_activities = self.all_activities + electricity_items
         
-        # 폼 초기화
-        self.electricity_type = ""
-        self.electricity_hours = 0.0
+        electricity_data = []
         
-        return rx.redirect("/input/waste")
+        if self.show_ac and form_data.get("ac_value"):
+            electricity_data.append({
+                "category": "전기",
+                "activity_type": "냉방기",
+                "value": float(form_data.get("ac_value", 0)),
+            })
+        
+        if self.show_heater and form_data.get("heater_value"):
+            electricity_data.append({
+                "category": "전기",
+                "activity_type": "난방기",
+                "value": float(form_data.get("heater_value", 0)),
+            })
+        
+        self.all_activities = self.all_activities + electricity_data
+        import sys
+        sys.stderr.write(f"[전기 제출] electricity_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[전기 제출] electricity_data: {electricity_data}\n")
+        sys.stderr.write(f"[전기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.electricity_input_mode = False
+        self.selected_ac = False
+        self.selected_heater = False
+        self.show_ac = False
+        self.show_heater = False
+        
+        yield rx.redirect("/input/water")
     
     # ------------------------------ 쓰레기 관련 메서드 ------------------------------
     
-    # 쓰레기 입력 상태
-    waste_type: str = ""
-    waste_amount: float = 0.0
-    waste_unit: str = "kg"
+    def toggle_general(self):
+        self.selected_general = not self.selected_general
     
-    def handle_waste_submit(self, form_data: dict):
-        """쓰레기 입력값 제출 처리"""
+    def toggle_plastic(self):
+        self.selected_plastic = not self.selected_plastic
+    
+    def toggle_paper(self):
+        self.selected_paper = not self.selected_paper
+    
+    def toggle_glass(self):
+        self.selected_glass = not self.selected_glass
+    
+    def toggle_can(self):
+        self.selected_can = not self.selected_can
+    
+    def show_waste_input_fields(self):
+        """선택된 항목들의 입력 필드를 표시"""
+        print(f"[쓰레기] show_waste_input_fields 호출됨")
+        print(f"[쓰레기] 선택된 항목: general={self.selected_general}, plastic={self.selected_plastic}, paper={self.selected_paper}, glass={self.selected_glass}, can={self.selected_can}")
+        self.show_general = self.selected_general
+        self.show_plastic = self.selected_plastic
+        self.show_paper = self.selected_paper
+        self.show_glass = self.selected_glass
+        self.show_can = self.selected_can
+        self.waste_input_mode = True
+        print(f"[쓰레기] waste_input_mode를 True로 설정함")
+
+    def reset_waste_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        print(f"[쓰레기] reset_waste_selection 호출됨")
+        self.waste_input_mode = False
+        self.selected_general = False
+        self.selected_plastic = False
+        self.selected_paper = False
+        self.selected_glass = False
+        self.selected_can = False
+        self.show_general = False
+        self.show_plastic = False
+        self.show_paper = False
+        self.show_glass = False
+        self.show_can = False
+    
+    def handle_waste_submit_direct(self):
+        """쓰레기 입력값 직접 제출 (form 제출 강제)"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit_direct 호출됨\n")
+        sys.stderr.flush()
+        
+        # JavaScript로 form 제출 강제
+        return rx.call_script("""
+            (function() {
+                const form = document.getElementById('waste-form');
+                if (!form) {
+                    console.error('waste-form을 찾을 수 없습니다');
+                    return;
+                }
+                console.log('form 제출 강제 시도');
+                // form 제출 강제
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                form.dispatchEvent(submitEvent);
+            })()
+        """)
+    
+    async def handle_waste_submit_from_script(self, form_data: dict):
+        """스크립트에서 수집한 form 데이터로 쓰레기 제출 처리"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit_from_script 호출됨\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 타입: {type(form_data)}\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 내용: {form_data}\n")
+        sys.stderr.flush()
+        
+        if not form_data:
+            form_data = {}
+        
         # 기존 쓰레기 데이터 제거
         self.all_activities = [
-            act for act in self.all_activities
+            act for act in self.all_activities 
             if act.get("category") != "쓰레기"
         ]
-
-        waste_items = []
-
-        def add_waste(label: str, amount_key: str, unit_key: str):
-            value_str = form_data.get(amount_key)
-            if not value_str:
-                return
-            try:
-                value = float(value_str)
-            except ValueError:
-                return
-            if value <= 0:
-                return
-            unit = form_data.get(unit_key, "kg")
-            waste_items.append({
+        
+        waste_data = []
+        
+        if self.show_general and form_data.get("general_value"):
+            waste_data.append({
                 "category": "쓰레기",
-                "activity_type": label,
-                "value": value,
-                "unit": unit,
+                "activity_type": "일반쓰레기",
+                "value": float(form_data.get("general_value", 0)),
+                "unit": form_data.get("general_unit", "개"),
             })
-
-        add_waste("일반", "waste_general_amount", "waste_general_unit")
-        add_waste("플라스틱", "waste_plastic_amount", "waste_plastic_unit")
-        add_waste("종이", "waste_paper_amount", "waste_paper_unit")
-        add_waste("유리", "waste_glass_amount", "waste_glass_unit")
-        add_waste("캔", "waste_can_amount", "waste_can_unit")
-
-        if waste_items:
-            self.all_activities = self.all_activities + waste_items
         
-        # 폼 초기화
-        self.waste_type = ""
-        self.waste_amount = 0.0
-        self.waste_unit = "kg"
+        if self.show_plastic and form_data.get("plastic_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "플라스틱",
+                "value": float(form_data.get("plastic_value", 0)),
+                "unit": form_data.get("plastic_unit", "개"),
+            })
         
-        return rx.redirect("/input/water")
+        if self.show_paper and form_data.get("paper_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "종이",
+                "value": float(form_data.get("paper_value", 0)),
+                "unit": form_data.get("paper_unit", "개"),
+            })
+        
+        if self.show_glass and form_data.get("glass_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "유리",
+                "value": float(form_data.get("glass_value", 0)),
+                "unit": form_data.get("glass_unit", "개"),
+            })
+        
+        if self.show_can and form_data.get("can_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "캔",
+                "value": float(form_data.get("can_value", 0)),
+                "unit": form_data.get("can_unit", "개"),
+            })
+        
+        self.all_activities = self.all_activities + waste_data
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] waste_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[쓰레기 제출] waste_data: {waste_data}\n")
+        sys.stderr.write(f"[쓰레기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.waste_input_mode = False
+        self.selected_general = False
+        self.selected_plastic = False
+        self.selected_paper = False
+        self.selected_glass = False
+        self.selected_can = False
+        self.show_general = False
+        self.show_plastic = False
+        self.show_paper = False
+        self.show_glass = False
+        self.show_can = False
+        
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[쓰레기 제출] 리포트로 리다이렉트 시도...")
+        print(f"[쓰레기 제출] 최종 all_activities: {self.all_activities}")
+        
+        # 리포트로 이동 (리포트 페이지에서 on_report_page_load가 자동으로 계산 수행)
+        import sys
+        sys.stdout.flush()
+        yield rx.redirect("/report")
+    
+    async def handle_waste_submit(self, form_data: dict):
+        """쓰레기 입력값 폼 제출 -> 데이터 저장 -> 리포트로 이동"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit 호출됨\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 타입: {type(form_data)}\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 내용: {form_data}\n")
+        sys.stderr.flush()
+        
+        # 기존 쓰레기 데이터 제거
+        self.all_activities = [
+            act for act in self.all_activities 
+            if act.get("category") != "쓰레기"
+        ]
+        
+        waste_data = []
+        
+        if self.show_general and form_data.get("general_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "일반쓰레기",
+                "value": float(form_data.get("general_value", 0)),
+                "unit": form_data.get("general_unit", "개"),
+            })
+        
+        if self.show_plastic and form_data.get("plastic_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "플라스틱",
+                "value": float(form_data.get("plastic_value", 0)),
+                "unit": form_data.get("plastic_unit", "개"),
+            })
+        
+        if self.show_paper and form_data.get("paper_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "종이",
+                "value": float(form_data.get("paper_value", 0)),
+                "unit": form_data.get("paper_unit", "개"),
+            })
+        
+        if self.show_glass and form_data.get("glass_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "유리",
+                "value": float(form_data.get("glass_value", 0)),
+                "unit": form_data.get("glass_unit", "개"),
+            })
+        
+        if self.show_can and form_data.get("can_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "캔",
+                "value": float(form_data.get("can_value", 0)),
+                "unit": form_data.get("can_unit", "개"),
+            })
+        
+        self.all_activities = self.all_activities + waste_data
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] waste_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[쓰레기 제출] waste_data: {waste_data}\n")
+        sys.stderr.write(f"[쓰레기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.waste_input_mode = False
+        self.selected_general = False
+        self.selected_plastic = False
+        self.selected_paper = False
+        self.selected_glass = False
+        self.selected_can = False
+        self.show_general = False
+        self.show_plastic = False
+        self.show_paper = False
+        self.show_glass = False
+        self.show_can = False
+        
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[쓰레기 제출] 리포트로 리다이렉트 시도...")
+        print(f"[쓰레기 제출] 최종 all_activities: {self.all_activities}")
+        
+        # 리포트로 이동 (리포트 페이지에서 on_report_page_load가 자동으로 계산 수행)
+        import sys
+        sys.stdout.flush()
+        yield rx.redirect("/report")
     
     # ------------------------------ 물 관련 메서드 ------------------------------
     
-    # 물 입력 상태
-    water_type: str = ""
-    water_amount: float = 0.0
-    water_unit: str = "회"
+    def toggle_shower(self):
+        self.selected_shower = not self.selected_shower
+    
+    def toggle_dish(self):
+        self.selected_dish = not self.selected_dish
+    
+    def toggle_laundry(self):
+        self.selected_laundry = not self.selected_laundry
+    
+    def show_water_input_fields(self):
+        """선택된 항목들의 입력 필드를 표시"""
+        self.show_shower = self.selected_shower
+        self.show_dish = self.selected_dish
+        self.show_laundry = self.selected_laundry
+        self.water_input_mode = True
+
+    def reset_water_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.water_input_mode = False
+        self.selected_shower = False
+        self.selected_dish = False
+        self.selected_laundry = False
+        self.show_shower = False
+        self.show_dish = False
+        self.show_laundry = False
     
     async def handle_water_submit(self, form_data: dict):
-        """물 입력값 제출 처리"""
+        """물 입력값 폼 제출 -> 데이터 저장 -> 리포트로 이동"""
+        print(f"[물 제출] handle_water_submit 호출됨, form_data: {form_data}")
+        
         # 기존 물 데이터 제거
         self.all_activities = [
-            act for act in self.all_activities
+            act for act in self.all_activities 
             if act.get("category") != "물"
         ]
-
-        water_items = []
-
-        def add_water(label: str, count_key: str, unit_key: str):
-            value_str = form_data.get(count_key)
-            if not value_str:
-                return
-            try:
-                value = float(value_str)
-            except ValueError:
-                return
-            if value <= 0:
-                return
-            unit = form_data.get(unit_key, "회")
-            water_items.append({
+        
+        water_data = []
+        
+        if self.show_shower and form_data.get("shower_value"):
+            water_data.append({
                 "category": "물",
-                "activity_type": label,
-                "value": value,
-                "unit": unit,
+                "activity_type": "샤워",
+                "value": float(form_data.get("shower_value", 0)),
+                "unit": form_data.get("shower_unit", "회"),
             })
-
-        add_water("샤워", "water_shower_count", "water_shower_unit")
-        add_water("설거지", "water_dish_count", "water_dish_unit")
-        add_water("세탁", "water_laundry_count", "water_laundry_unit")
-
-        if water_items:
-            self.all_activities = self.all_activities + water_items
         
-        # 폼 초기화
-        self.water_type = ""
-        self.water_amount = 0.0
-        self.water_unit = "회"
+        if self.show_dish and form_data.get("dish_count"):
+            water_data.append({
+                "category": "물",
+                "activity_type": "설거지",
+                "value": float(form_data.get("dish_count", 0)),
+                "unit": "회",
+            })
         
-        # 리포트로 이동하기 전에 자동으로 계산 수행
-        await self.calculate_report()
+        if self.show_laundry and form_data.get("laundry_count"):
+            water_data.append({
+                "category": "물",
+                "activity_type": "세탁",
+                "value": float(form_data.get("laundry_count", 0)),
+                "unit": "회",
+            })
         
-        return rx.redirect("/report")
+        self.all_activities = self.all_activities + water_data
+        import sys
+        sys.stderr.write(f"[물 제출] water_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[물 제출] water_data: {water_data}\n")
+        sys.stderr.write(f"[물 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.water_input_mode = False
+        self.selected_shower = False
+        self.selected_dish = False
+        self.selected_laundry = False
+        self.show_shower = False
+        self.show_dish = False
+        self.show_laundry = False
+        
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[물 제출] 쓰레기 페이지로 리다이렉트 시도...")
+        
+        # 쓰레기 페이지로 이동
+        yield rx.redirect("/input/waste")
     
     # ------------------------------ 리포트 계산 메서드 ------------------------------
     
     async def calculate_report(self):
         """리포트 페이지에서 전체 탄소 배출량을 계산합니다."""
         logger.info("[리포트 계산] 시작 - 전체 활동 데이터 계산 중...")
+        print(f"[리포트 계산] all_activities 개수: {len(self.all_activities)}")
+        print(f"[리포트 계산] all_activities 내용: {self.all_activities}")
         
         try:
             from ..service.carbon_calculator import calculate_carbon_emission
@@ -579,6 +1082,14 @@ class CarbonState(AuthState):
             calculation_details = []  # 상세 계산 내역 저장
             
             logger.info(f"[리포트 계산] 총 {len(self.all_activities)}개의 활동 데이터 처리 시작")
+            
+            # 활동 데이터가 없으면 계산하지 않음
+            if len(self.all_activities) == 0:
+                logger.warning("[리포트 계산] 활동 데이터가 없습니다. 계산을 건너뜁니다.")
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+                self.calculation_details = []
+                return
             
             for idx, activity in enumerate(self.all_activities):
                 category = activity.get("category", "")
@@ -905,7 +1416,7 @@ class CarbonState(AuthState):
                     # 빈티지 제품 사용 확인
                     vintage_count = sum(int(act.get("value", 0)) for act in self.all_activities 
                                       if act.get("category") == "의류" 
-                                      and act.get("sub_category") == "빈티지")
+                                      and (act.get("sub_category") == "빈티지" or act.get("subcategory") == "빈티지" or act.get("sub") == "빈티지"))
                     if vintage_count > 0:
                         reasons.append(f"빈티지 제품 {vintage_count}개")
                     # 평균보다 낮은 배출량 확인
@@ -1123,6 +1634,7 @@ class CarbonState(AuthState):
     average_comparison: Dict[str, Dict[str, float]] = {}
     average_comparison_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태 (사용 안 함)
     total_average_comparison: Dict[str, Any] = {}  # 총 평균 비교만 사용
+    has_average_comparison: bool = False  # 평균 비교 데이터 존재 여부
     category_emission_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태
     donut_chart_svg: str = ""  # 도넛 차트 SVG 문자열
     ai_analysis_result: str = ""
@@ -1233,7 +1745,7 @@ class CarbonState(AuthState):
             vintage_count = 0
             for activity in self.all_activities:
                 category = activity.get("category")
-                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("sub")
                 if category == "의류" and sub_category == "빈티지":
                     vintage_count += int(activity.get("value", 0))
             
@@ -1285,7 +1797,7 @@ class CarbonState(AuthState):
             logger.info(f"[포인트 계산] all_activities 개수: {len(self.all_activities)}")
             for activity in self.all_activities:
                 category = activity.get("category")
-                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("sub")
                 value = activity.get("value", 0)
                 logger.info(f"[포인트 계산] 활동 확인: category={category}, sub_category={sub_category}, value={value}")
                 if category == "의류" and sub_category == "빈티지":
@@ -1352,6 +1864,7 @@ class CarbonState(AuthState):
                 "abs_difference_str": f"차이: {abs_difference:.2f} kgCO₂e",
                 "percentage_str": f"({percentage:.1f}%)",
             }
+            self.has_average_comparison = True
             
             # 카테고리별 평균 비교는 제거
             self.average_comparison = {}
@@ -1372,8 +1885,20 @@ class CarbonState(AuthState):
                 "쓰레기": "#ef4444"
             }
             
+            # 카테고리별 평균값 가져오기
+            from ..service.average_data import get_average_emission
+            
             for category, emission in category_emission.items():
                 percentage = (emission / total) * 100 if total > 0 else 0
+                
+                # 카테고리별 평균값과 비교
+                avg_emission = get_average_emission(category)
+                difference = emission - avg_emission
+                diff_percentage = (difference / avg_emission * 100) if avg_emission > 0 else 0
+                is_better = difference < 0
+                
+                # 포인트 계산 (평균 대비 포인트는 전체 포인트 계산에서 사용)
+                # 여기서는 표시용으로만 저장
                 category_list.append({
                     "category": category,
                     "emission": round(emission, 2),
@@ -1383,7 +1908,14 @@ class CarbonState(AuthState):
                     "cumulative_percentage": cumulative_percentage,
                     "stroke_dasharray": f"{2 * 3.14159 * 80 * (percentage / 100)} {2 * 3.14159 * 80}",
                     "stroke_dashoffset": cumulative_percentage * 2 * 3.14159 * 80 / 100,
-                    "rotation": -90 + cumulative_percentage * 360 / 100
+                    "rotation": -90 + cumulative_percentage * 360 / 100,
+                    # 평균 비교 데이터
+                    "average_emission": round(avg_emission, 2),
+                    "difference": round(difference, 2),
+                    "diff_percentage": round(diff_percentage, 1),
+                    "is_better": is_better,
+                    "diff_str": f"{abs(difference):.2f} kgCO₂e {'절감' if is_better else '초과'}",
+                    "diff_percentage_str": f"{abs(diff_percentage):.1f}% {'낮음' if is_better else '높음'}"
                 })
                 cumulative_percentage += percentage
             
@@ -1400,6 +1932,7 @@ class CarbonState(AuthState):
             self.average_comparison = {}
             self.average_comparison_list = []
             self.total_average_comparison = {}
+            self.has_average_comparison = False
             self.category_emission_list = []
             self.donut_chart_svg = ""
     
@@ -1535,18 +2068,79 @@ class CarbonState(AuthState):
                     url = p.get("url") or ""
                     if name or desc or url:
                         alternatives.append({
-                            "current": name or "정책 정보",
-                            "alternative": desc or "",
-                            "impact": url or "",
+                            "current": name,
+                            "alternative": desc,
+                            "impact": url,
                         })
+            # 정책 추천이 비어있으면 기본 정책 후보 사용
+            if not alternatives and hasattr(self, "policy_candidates") and self.policy_candidates:
+                for policy in self.policy_candidates:
+                    alternatives.append({
+                        "current": policy.get("name", ""),
+                        "alternative": policy.get("reason", ""),
+                        "impact": policy.get("url", ""),
+                    })
+            
             self.ai_alternatives = alternatives
             
-            logger.info(f"AI 분석 결과 생성 완료 (Gemini + 폴백) - 정책 추천 {len(alternatives)}개")
+            logger.info(f"AI 분석 결과 생성 완료 - 분석: {len(self.ai_analysis_result)}자, 제안: {len(self.ai_suggestions)}개, 정책: {len(self.ai_alternatives)}개")
             
         except Exception as e:
             logger.error(f"AI 분석 결과 생성 오류: {e}", exc_info=True)
             self.ai_analysis_result = "AI 분석을 불러오는 중 오류가 발생했습니다."
             self.ai_suggestions = []
-            self.ai_alternatives = []
+            # 오류 발생 시에도 기본 정책 후보 표시
+            if hasattr(self, "policy_candidates") and self.policy_candidates:
+                self.ai_alternatives = [
+                    {
+                        "current": policy.get("name", ""),
+                        "alternative": policy.get("reason", ""),
+                        "impact": policy.get("url", ""),
+                    }
+                    for policy in self.policy_candidates
+                ]
+            else:
+                self.ai_alternatives = []
         finally:
             self.is_loading_ai = False
+
+    async def on_report_page_load(self):
+        """리포트 페이지 로드 시 자동으로 계산 및 AI 분석 실행 (하루에 여러 번 가능)"""
+        import sys
+        print("[리포트 페이지] 자동 계산 시작...", file=sys.stderr, flush=True)
+        print(f"[리포트 페이지] all_activities 개수: {len(self.all_activities)}", file=sys.stderr, flush=True)
+        print(f"[리포트 페이지] all_activities 내용: {self.all_activities}", file=sys.stderr, flush=True)
+        
+        try:
+            # 리포트는 항상 새로 계산 (하루에 여러 번 생성 가능)
+            print("[리포트 페이지] 리포트 계산 시작...")
+            if len(self.all_activities) == 0:
+                print("[리포트 페이지] ⚠️ 경고: all_activities가 비어있습니다!")
+                # 빈 리포트라도 계산 완료로 표시
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+                self.calculation_details = []
+                self.ai_analysis_result = ""  # AI 분석도 초기화
+            else:
+                # 리포트 재계산 (항상 새로 계산)
+                self.is_report_calculated = False
+                self.ai_analysis_result = ""  # AI 분석도 초기화하여 재생성
+                await self.calculate_report()
+                print(f"[리포트 페이지] 리포트 계산 완료. is_report_calculated: {self.is_report_calculated}")
+                print(f"[리포트 페이지] 총 배출량: {self.total_carbon_emission}kgCO2e")
+            
+            # AI 분석 실행 (항상 새로 생성)
+            if self.is_report_calculated:
+                print("[리포트 페이지] AI 분석 시작...")
+                await self.generate_ai_analysis()
+            
+            print("[리포트 페이지] 자동 계산 및 AI 분석 완료")
+        except Exception as e:
+            print(f"[리포트 페이지] ❌ 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            # 오류 발생 시에도 리포트 표시 가능하도록
+            if not self.is_report_calculated:
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+

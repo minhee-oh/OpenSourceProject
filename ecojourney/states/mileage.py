@@ -41,11 +41,11 @@ class MileageState(BattleState):
         if self.mileage_request_points < 1000:
             self.mileage_error_message = "환산 신청은 최소 1000점 이상부터 가능합니다."
             return
-        
+
         if self.mileage_request_points > self.current_user_points:
             self.mileage_error_message = "보유 포인트가 부족합니다."
             return
-        
+
         try:
             from sqlmodel import Session, create_engine, select
             import os
@@ -101,7 +101,7 @@ class MileageState(BattleState):
             self.mileage_error_message = f"마일리지 환산 실패: {str(e)}"
             logger.error(f"마일리지 환산 오류: {e}", exc_info=True)
     
-    async def load_mileage_conversion_logs(self):
+    def load_mileage_conversion_logs(self):
         """마일리지 환산 내역 로드"""
         if not self.is_logged_in:
             self.mileage_conversion_logs = []

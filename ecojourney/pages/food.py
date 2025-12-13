@@ -1,15 +1,45 @@
 # food.py
 
 import reflex as rx
-from ..state import AppState
+from ..states import AppState
 from .help_modal import help_icon_button, help_modal
+from .common_header import header
+
+# 세부 카테고리 선택 컴포넌트가 누락되어 NameError가 발생해 추가합니다.
+def subcategory_selection_section(label: str, options: list, selected_state: list) -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.text(label, font_weight="bold", size="4", color="#333"),
+            rx.vstack(
+                *[
+                    rx.checkbox(
+                        text,
+                        value=text,
+                        is_checked=selected_state.contains(text),
+                        on_change=lambda checked, t=text: AppState.toggle_food_subcategory(label, t),
+                    )
+                    for text in options
+                ],
+                spacing="1",
+                align="start",
+            ),
+            spacing="2",
+            align="start",
+            padding="12px",
+            border="1px solid",
+            border_color="gray.200",
+            border_radius="10px",
+            background="white",
+        ),
+        width="100%",
+    )
 
 FOOD_SUBCATEGORIES = {
-    "유제품류": ["우유", "치즈", "두유"],
-    "쌀밥": ["쌀밥", "잡곡밥", "현미밥", "보리밥", "콩밥", "김밥", "비빔밥불고기", "비빔밥산채", "김치볶음밥"],
+    "유제품": ["우유", "치즈", "두유"],
+    "밥": ["쌀밥", "잡곡밥", "현미밥", "보리밥", "콩밥", "김밥", "비빔밥불고기", "비빔밥산채", "김치볶음밥"],
     "커피": ["에스프레소", "카페라떼"],  # 한국일보 기준만
     "패스트푸드": ["피자", "햄버거세트", "후라이드치킨"],  # 한국일보 기준만
-    "면류": ["물냉면", "비빔냉면", "잔치국수", "비빔국수", "해물칼국수"],  # 한국일보 기준만
+    "면": ["물냉면", "비빔냉면", "잔치국수", "비빔국수", "해물칼국수"],  # 한국일보 기준만
     "국/찌개": ["된장국", "미역국", "콩나물국", "된장찌개", "김치찌개", "순두부찌개", "설렁탕", "갈비탕", "곰탕"],  # 한국일보 기준만
     "반찬": ["배추김치", "깍두기", "총각김치", "열무김치", "숙주나물", "콩나물무침", "시금치나물", "무생채", "소고기장조림", "멸치조림", "콩자반", "깻잎장아찌", "제육볶음", "오징어볶음", "불고기", "잡채", "고등어구이", "달걀프라이", "달걀찜"],
     "고기": ["소고기구이", "삼겹살구이"],
@@ -17,153 +47,15 @@ FOOD_SUBCATEGORIES = {
     # Climatiq API 사용 항목
     "파스타": ["카르보나라", "라자냐", "라비올리", "파스타샐러드"],  # Climatiq API 사용 (완성된 요리만)
 }
-UNITS = ["g", "ml", "회"]
 
-def header() -> rx.Component:
-    return rx.box(
-        rx.hstack(
-            rx.button(
-                "EcoJourney",
-                on_click=rx.redirect("/"),
-                background_color="transparent",   # 버튼 배경 제거
-                color="white",
-                font_size="1.5em",
-                font_weight="bold",
-                padding="0",                     # 버튼 기본 padding 제거
-                border="none",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-            rx.cond(
-                AppState.is_logged_in,
-                rx.hstack(
-                    rx.button(
-                        "정보글",
-                        on_click=rx.redirect("/info"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
-                        padding="8px 20px",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
-                        },
-                    ),
-                    rx.button(
-                        "대결",
-                        on_click=rx.redirect("/battle"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
-                        padding="8px 20px",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
-                        },
-                    ),
-                    rx.button(
-                        "랭킹",
-                        on_click=rx.redirect("/ranking"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
-                        padding="8px 20px",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
-                        },
-                    ),
-                    rx.button(
-                        "마이페이지",
-                        on_click=rx.redirect("/mypage"),
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
-                        padding="8px 20px",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
-                        },
-                    ),
-                    rx.text(
-                        f"{AppState.current_user_id}님",
-                        color="white",
-                        font_size="1em",
-                        margin_right="10px",
-                    ),
-                    rx.button(
-                        "로그아웃",
-                        on_click=AppState.logout,
-                        background_color="rgba(255, 255, 255, 0.2)",
-                        color="white",
-                        border="1px solid rgba(255, 255, 255, 0.3)",
-                        border_radius="20px",
-                        padding="8px 20px",
-                        _hover={
-                            "background_color": "rgba(255, 255, 255, 0.3)",
-                        },
-                    ),
-                    spacing="3",
-                    align="center",
-                ),
-                rx.button(
-                    "로그인",
-                    on_click=rx.redirect("/auth"),
-                    background_color="rgba(255, 255, 255, 0.2)",
-                    color="white",
-                    border="1px solid rgba(255, 255, 255, 0.3)",
-                    border_radius="20px",
-                    padding="8px 20px",
-                    _hover={
-                        "background_color": "rgba(255, 255, 255, 0.3)",
-                    },
-                ),
-            ),
-            justify="between",
-            align="center",
-            padding="1em 2em",
-        ),
-        width="100%",
-        position="relative",
-        z_index="10",
-        background_color="transparent",
-    )
 
-def background_video() -> rx.Component:
-    """순수 HTML5 <video> 태그를 사용하여 자동 재생을 강제하고 레이어를 안정화합니다."""
-    return rx.box(
-        # 💡 rx.html을 사용하여 필수 속성을 가진 순수 HTML 태그를 삽입
-        rx.html(
-            # src 경로가 정확한지 확인하면서, 필수 속성(autoplay, loop, muted, playsinline)을 강제합니다.
-            """
-            <video autoplay loop muted playsinline 
-                src="/transportation_background.mp4" 
-                style='
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                    object-position: center bottom;
-                    z-index: -2; 
-                    filter: brightness(0.6);'
-            />
-            """
-        ),
-        # 바깥 box는 배경 레이어의 위치 기준점 역할을 합니다.
-        width="100%",
-        height="100%",
-        z_index="-2",
-    )
 
 # =======================================================
 # 공통 버튼 UI
 # =======================================================
 
 def food_button(label: str, is_selected, on_click):
-
-    # 🔥 input_mode 상태를 가져옴 (Var 그대로)
+    """상위 카테고리 선택 버튼"""
     disabled = AppState.food_input_mode
 
     base = rx.hstack(
@@ -171,28 +63,65 @@ def food_button(label: str, is_selected, on_click):
         spacing="2",
     )
 
-    # 🔥 스타일도 rx.cond 로 처리해야 함
-    selected_bg = rx.cond(disabled, "rgba(0,0,0,0.2)", "rgba(0,0,0,0.52)")
-    default_bg  = rx.cond(disabled, "rgba(0,0,0,0.1)", "rgba(0,0,0,0.22)")
+    selected_bg = rx.cond(disabled, "rgba(77, 171, 117, 0.4)", "#4DAB75")
+    default_bg  = rx.cond(disabled, "rgba(77, 171, 117, 0.05)", "rgba(77, 171, 117, 0.1)")
 
+    text_color = rx.cond(is_selected, "#FFFFFF", "#4DAB75")
     cursor_style = rx.cond(disabled, "not-allowed", "pointer")
 
     return rx.button(
         base,
-        # 🔥 클릭 비활성화 → on_click 제거 조건화
         on_click=rx.cond(disabled, None, on_click),
-
-        disabled=disabled,  # 🔥 Reflex는 disabled에 Var 허용
-
-        # 🔥 선택 여부에 따른 스타일
+        disabled=disabled,
         background_color=rx.cond(is_selected, selected_bg, default_bg),
-
-        border_radius="40px",
-        padding=rx.cond(is_selected, "27px 40px", "24px 40px"),
-        border="4px solid rgba(255, 255, 255, 0.5)",
-        font_size="1.1em",
-        font_weight="bold",
+        color=text_color,
+        border_radius="30px",
+        padding=rx.cond(is_selected, "18px 36px", "16px 32px"),
+        border=rx.cond(is_selected, "2px solid #4DAB75", "1px solid rgba(77, 171, 117, 0.3)"),
+        font_size="1em",
+        font_weight="600",
         cursor=cursor_style,
+        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        box_shadow=rx.cond(is_selected, "0 4px 20px rgba(77, 171, 117, 0.4)", "0 2px 8px rgba(0, 0, 0, 0.1)"),
+        class_name="category-button",
+        _hover=rx.cond(
+            disabled,
+            {},
+            {
+                "transform": "translateY(-3px) scale(1.02)",
+                "background_color": rx.cond(is_selected, "#3d9a66", "rgba(77, 171, 117, 0.25)"),
+                "box_shadow": "0 8px 30px rgba(77, 171, 117, 0.5)",
+            }
+        ),
+        _active=rx.cond(
+            disabled,
+            {},
+            {
+                "transform": "translateY(0) scale(0.98)",
+            }
+        ),
+    )
+
+def subcategory_checkbox(category: str, subcategory: str, selected_list):
+    """세부 카테고리 체크박스"""
+    return rx.hstack(
+        rx.checkbox(
+            checked=selected_list.contains(subcategory),
+            on_change=lambda: AppState.toggle_food_subcategory(category, subcategory),
+            color_scheme="green",
+        ),
+        rx.text(
+            subcategory,
+            font_size="0.95em",
+            color="#333333",
+        ),
+        spacing="2",
+        align="center",
+        padding="10px 16px",
+        border_radius="12px",
+        background_color="#FFFFFF",
+        border="1px solid #E0E0E0",
+        cursor="pointer",
         transition="all 0.2s ease",
     )
 
@@ -250,71 +179,63 @@ def food_input_field(label: str, value_name: str, unit_name: str, sub_name: str)
             align="center",
             justify="center",
         ),
-        padding="16px 20px",
-        border_radius="16px",
-        background_color="rgba(0, 0, 0, 0.1)",
-        border="2px solid rgba(0, 0, 0, 0.2)",
-        margin_y="10px",
+        spacing="2",
+        align="start",
         width="100%",
-        max_width="550px",
+        padding="20px",
+        border_radius="20px",
+        background_color="#FFFFFF",
+        border="1px solid #E0E0E0",
+        margin_y="12px",
     )
 
-
-def food_input_field_api(label: str, value_name: str, unit_name: str, sub_name: str = None):
-    """Climatiq API 사용 항목용 입력 필드 (단위 선택 가능: g, kg, 하위 카테고리 선택 가능)"""
-    sub_items = FOOD_SUBCATEGORIES.get(label, [])
-    has_subcategories = len(sub_items) > 0
-    
+def quantity_input_field(category_key: str, subcategory: str):
+    """횟수 입력 필드 (개별 세부 카테고리용)"""
     return rx.box(
         rx.hstack(
             rx.text(
-                label,
-                font_weight="bold",
-                min_width="80px",
-                color="black",
-            ),
-            rx.cond(
-                has_subcategories,
-                rx.select(
-                    items=sub_items,
-                    placeholder=f"세부 카테고리 선택",
-                    name=sub_name,
-                    width="140px",
-                    background_color="rgba(255, 255, 255, 0.9)",
-                    color="black",
-                    border_radius="8px",
-                ),
-                rx.box(width="140px"),  # 하위 카테고리가 없으면 빈 공간
-            ),
-            rx.select(
-                ["g", "kg"],
-                placeholder="단위",
-                name=unit_name,
-                width="100px",
-                background_color="rgba(255, 255, 255, 0.9)",
-                color="black",
-                border_radius="8px",
+                subcategory,
+                font_weight="600",
+                min_width="120px",
+                color="#333333",
             ),
             rx.input(
-                placeholder="무게 입력",
+                placeholder="횟수 입력",
                 type="number",
-                name=value_name,
-                width="140px",
-                background_color="rgba(255, 255, 255, 0.9)",
-                color="black",
-                border_radius="8px",
+                name=f"{category_key}_{subcategory}_value",
+                width="150px",
+                background_color="#FFFFFF",
+                color="#333333",
+                border_radius="12px",
+                border="1px solid #E0E0E0",
+                padding="3px 12px",
+                _focus={
+                    "border": "2px solid #4DAB75",
+                    "outline": "none",
+                },
+                _placeholder={
+                    "color": "#999999",
+                },
+            ),
+            rx.text(
+                "회",
+                min_width="40px",
+                color="#333333",
+                font_weight="600",
+                text_align="center",
             ),
             spacing="4",
             align="center",
             justify="center",
+            padding="16px 20px",
+            border_radius="16px",
+            background_color="#FFFFFF",
+            border="1px solid #E0E0E0",
         ),
-        padding="16px 20px",
-        border_radius="16px",
-        background_color="rgba(0, 0, 0, 0.1)",
-        border="2px solid rgba(0, 0, 0, 0.2)",
-        margin_y="10px",
+        display="flex",
+        justify_content="center",
         width="100%",
-        max_width="550px",
+        margin_y="8px",
     )
 
 
@@ -323,36 +244,120 @@ def food_input_field_api(label: str, value_name: str, unit_name: str, sub_name: 
 # =======================================================
 
 def food_page():
-    return rx.box(
-        background_video(),
-        header(),
-        rx.container(
-            rx.vstack(
-                rx.hstack(
-                    rx.heading("음식 선택", size="7", color="white"),
-                    help_icon_button("식품"),
-                    spacing="2",
-                    align="center",
+    return rx.cond(
+        AppState.is_logged_in,
+        rx.box(
+            header(),
+            # 헤더 공간 확보
+            rx.box(height="100px"),
+            # fade-in 애니메이션을 위한 CSS 삽입
+            rx.html("""
+            <style>
+            @keyframes fadeInUp {
+                0% {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            @keyframes pulse {
+                0%, 100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.05);
+                }
+            }
+            @keyframes bounce {
+                0%, 100% {
+                    transform: translateY(0);
+                }
+                50% {
+                    transform: translateY(-5px);
+                }
+            }
+            .category-button {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .category-button:hover:not(:disabled) {
+                animation: pulse 0.6s ease-in-out;
+            }
+            .category-button:active:not(:disabled) {
+                animation: bounce 0.3s ease-in-out;
+            }
+            </style>
+            """),
+            # 배경 레이어 구성
+            rx.box(
+                # 상단 배경 레이어 + 제목과 설명 (고정)
+                rx.box(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.heading(
+                                "식품 🍽️",
+                                size="7",
+                                color="#333333",
+                                margin_bottom="18px",
+                                style={
+                                    "opacity": 0,
+                                    "transform": "translateY(20px)",
+                                    "animation": "fadeInUp 0.8s ease forwards",
+                                    "animation-delay": "0.1s",
+                                    "pointer_events": "none",
+                                },
+                            ),
+                            rx.box(
+                                help_icon_button("식품"),
+                                style={"pointer_events": "auto"},
+                            ),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.text(
+                            "오늘 섭취한 음식을 모두 선택해주세요",
+                            color="#333333",
+                            size="5",
+                            font_weight="normal",
+                            text_align="center",
+                            width="100%",
+                            style={
+                                "opacity": 0,
+                                "transform": "translateY(20px)",
+                                "animation": "fadeInUp 1s ease forwards",
+                                "animation-delay": "0.25s",
+                                "pointer_events": "none",
+                            },
+                        ),
+                        spacing="3",
+                        align="center",
+                        justify="center",
+                        padding_top="40px",
+                        padding_bottom="20px",
+                    ),
+                    width="100%",
+                    background="transparent",
+                    position="relative",
+                    left="0",
+                    z_index="10",
+                    pointer_events="none",
                 ),
-                rx.text(
-                    "오늘 섭취한 음식을 모두 선택해주세요",
-                    color="rgba(255, 255, 255, 0.8)",
-                    font_size="1.1em",
-                ),
-                help_modal("식품"),
-
-                rx.box(height="30px"),
-
+                # 실제 콘텐츠
+                rx.box(
+                    rx.card(
+                        rx.vstack(
                 # ----------------------------------
                 # 버튼 선택 영역
                 # ----------------------------------
                 rx.vstack(
                     rx.hstack(
-                        food_button("유제품류", AppState.selected_dairy, AppState.toggle_dairy),
-                        food_button("쌀밥", AppState.selected_rice, AppState.toggle_rice),
+                        food_button("유제품", AppState.selected_dairy, AppState.toggle_dairy),
+                        food_button("밥", AppState.selected_rice, AppState.toggle_rice),
                         food_button("커피", AppState.selected_coffee, AppState.toggle_coffee),
                         food_button("패스트푸드", AppState.selected_fastfood, AppState.toggle_fastfood),
-                        food_button("면류", AppState.selected_noodles, AppState.toggle_noodles),
+                        food_button("면", AppState.selected_noodles, AppState.toggle_noodles),
                         food_button("국/찌개", AppState.selected_cooked, AppState.toggle_cooked),
                         food_button("반찬", AppState.selected_side_dish, AppState.toggle_side_dish),
                         food_button("고기", AppState.selected_grilled_meat, AppState.toggle_grilled_meat),
@@ -365,96 +370,393 @@ def food_page():
                     spacing="3",
                 ),
 
-                rx.box(),
+                rx.box(height="20px"),
 
                 # ----------------------------------
-                # 입력하기 버튼
+                # 1단계: 세부 카테고리 선택
                 # ----------------------------------
                 rx.cond(
-                    ~AppState.food_input_mode,
-                    rx.button(
-                        "입력하기",
-                        on_click=AppState.show_food_input_fields,
-                        color="black",
-                        background_color="rgba(34,139,34,0.7)",
-                        border_radius="40px",
-                        padding="24px 45px",
-                        border="4px solid rgba(255,255,255,0.2)",
-                        font_size="1.1em",
-                        font_weight="600",
-                        cursor="pointer",
-                        _hover={"background_color": "rgba(34,139,34,0.9)"},
-                    ),
-                ),
+                    AppState.food_step == 1,
+                    rx.vstack(
+                        rx.text(
+                            "세부 카테고리를 선택해주세요",
+                            color="#333333",
+                            font_size="1.25em",
+                            font_weight="700",
+                            margin_bottom="20px",
+                            text_align="center",
+                        ),
 
-                rx.box(),
+                        # 유제품 세부 카테고리 선택
+                        rx.cond(AppState.show_dairy,
+                            subcategory_selection_section("유제품", FOOD_SUBCATEGORIES["유제품"], AppState.selected_dairy_subs)),
 
-                # ----------------------------------
-                # 입력 필드 렌더링
-                # ----------------------------------
-                rx.cond(
-                    AppState.food_input_mode,
-                    rx.form(
-                        rx.vstack(
-                            rx.text(
-                                "섭취량을 입력해주세요",
-                                color="black",
-                                font_size="1.2em",
-                                font_weight="bold",
-                                margin_bottom="10px",
+                        # 밥 세부 카테고리 선택
+                        rx.cond(AppState.show_rice,
+                            subcategory_selection_section("밥", FOOD_SUBCATEGORIES["밥"], AppState.selected_rice_subs)),
+
+                        # 커피 세부 카테고리 선택
+                        rx.cond(AppState.show_coffee,
+                            subcategory_selection_section("커피", FOOD_SUBCATEGORIES["커피"], AppState.selected_coffee_subs)),
+
+                        # 패스트푸드 세부 카테고리 선택
+                        rx.cond(AppState.show_fastfood,
+                            subcategory_selection_section("패스트푸드", FOOD_SUBCATEGORIES["패스트푸드"], AppState.selected_fastfood_subs)),
+
+                        # 면 세부 카테고리 선택
+                        rx.cond(AppState.show_noodles,
+                            subcategory_selection_section("면", FOOD_SUBCATEGORIES["면"], AppState.selected_noodles_subs)),
+
+                        # 국/찌개 세부 카테고리 선택
+                        rx.cond(AppState.show_cooked,
+                            subcategory_selection_section("국/찌개", FOOD_SUBCATEGORIES["국/찌개"], AppState.selected_cooked_subs)),
+
+                        # 반찬 세부 카테고리 선택
+                        rx.cond(AppState.show_side_dish,
+                            subcategory_selection_section("반찬", FOOD_SUBCATEGORIES["반찬"], AppState.selected_side_dish_subs)),
+
+                        # 고기 세부 카테고리 선택
+                        rx.cond(AppState.show_grilled_meat,
+                            subcategory_selection_section("고기", FOOD_SUBCATEGORIES["고기"], AppState.selected_grilled_meat_subs)),
+
+                        # 과일 세부 카테고리 선택
+                        rx.cond(AppState.show_fruit,
+                            subcategory_selection_section("과일", FOOD_SUBCATEGORIES["과일"], AppState.selected_fruit_subs)),
+
+                        # 파스타 세부 카테고리 선택
+                        rx.cond(AppState.show_pasta,
+                            subcategory_selection_section("파스타", FOOD_SUBCATEGORIES["파스타"], AppState.selected_pasta_subs)),
+
+                        rx.box(height="30px"),
+
+                        # 버튼 영역
+                        rx.hstack(
+                            # 다시 선택하기 버튼
+                            rx.button(
+                                "다시 선택하기",
+                                type="button",
+                                on_click=AppState.reset_food_selection,
+                                color="#4DAB75",
+                                background_color="transparent",
+                                border_radius="30px",
+                                padding="16px 40px",
+                                border="1px solid rgba(77, 171, 117, 0.3)",
+                                font_size="1.05em",
+                                font_weight="600",
+                                cursor="pointer",
+                                transition="all 0.25s ease",
+                                _hover={
+                                    "background_color": "rgba(77, 171, 117, 0.05)",
+                                    "border": "1px solid #4DAB75",
+                                },
                             ),
-
-                            rx.cond(AppState.show_dairy,
-                                food_input_field("유제품류", "dairy_value", "dairy_unit", "dairy_sub")),
-                            rx.cond(AppState.show_rice,
-                                food_input_field("쌀밥", "rice_value", "rice_unit", "rice_sub")),
-                            rx.cond(AppState.show_coffee,
-                                food_input_field("커피", "coffee_value", "coffee_unit", "coffee_sub")),
-                            rx.cond(AppState.show_fastfood,
-                                food_input_field("패스트푸드", "fastfood_value", "fastfood_unit", "fastfood_sub")),
-                            rx.cond(AppState.show_noodles,
-                                food_input_field("면류", "noodles_value", "noodles_unit", "noodles_sub")),
-                            rx.cond(AppState.show_cooked,
-                                food_input_field("국/찌개", "cooked_value", "cooked_unit", "cooked_sub")),
-                            rx.cond(AppState.show_side_dish,
-                                food_input_field("반찬", "side_dish_value", "side_dish_unit", "side_dish_sub")),
-                            rx.cond(AppState.show_grilled_meat,
-                                food_input_field("고기", "grilled_meat_value", "grilled_meat_unit", "grilled_meat_sub")),
-                            rx.cond(AppState.show_fruit,
-                                food_input_field("과일", "fruit_value", "fruit_unit", "fruit_sub")),
-                            rx.cond(AppState.show_pasta,
-                                food_input_field("파스타", "pasta_value", "pasta_unit", "pasta_sub")),
-
-                            rx.box(height="20px"),
-
                             # 다음 버튼
                             rx.button(
                                 "다음",
-                                type="submit",
-                                color="black",
-                                background_color="rgba(34,139,34,0.7)",
-                                border_radius="40px",
-                                padding="20px 50px",
-                                border="4px solid rgba(255,255,255,0.2)",
-                                font_size="1.1em",
+                                type="button",
+                                on_click=AppState.proceed_to_quantity_input,
+                                color="#FFFFFF",
+                                background_color="#4DAB75",
+                                border_radius="30px",
+                                padding="16px 52px",
+                                border="none",
+                                font_size="1.05em",
                                 font_weight="600",
                                 cursor="pointer",
-                                _hover={"background_color": "rgba(34,139,34,0.9)"},
+                                box_shadow="0 4px 20px rgba(77, 171, 117, 0.3)",
+                                transition="all 0.25s ease",
+                                _hover={
+                                    "background_color": "#3d9a66",
+                                    "transform": "translateY(-2px)",
+                                    "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.5)",
+                                },
+                            ),
+                            spacing="4",
+                            justify="center",
+                        ),
+
+                        align="center",
+                        width="100%",
+                        spacing="3",
+                        padding="20px",
+                    ),
+                ),
+
+                # ----------------------------------
+                # 2단계: 횟수 입력
+                # ----------------------------------
+                rx.cond(
+                    AppState.food_step == 2,
+                    rx.form(
+                        rx.vstack(
+                            rx.text(
+                                "섭취 횟수를 입력해주세요",
+                                color="#333333",
+                                font_size="1.25em",
+                                font_weight="700",
+                                margin_bottom="20px",
+                                text_align="center",
+                            ),
+
+                            # 유제품 횟수 입력
+                            rx.cond(AppState.show_dairy,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_dairy_subs,
+                                        lambda sub: quantity_input_field("dairy", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 밥 횟수 입력
+                            rx.cond(AppState.show_rice,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_rice_subs,
+                                        lambda sub: quantity_input_field("rice", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 커피 횟수 입력
+                            rx.cond(AppState.show_coffee,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_coffee_subs,
+                                        lambda sub: quantity_input_field("coffee", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 패스트푸드 횟수 입력
+                            rx.cond(AppState.show_fastfood,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_fastfood_subs,
+                                        lambda sub: quantity_input_field("fastfood", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 면 횟수 입력
+                            rx.cond(AppState.show_noodles,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_noodles_subs,
+                                        lambda sub: quantity_input_field("noodles", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 국/찌개 횟수 입력
+                            rx.cond(AppState.show_cooked,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_cooked_subs,
+                                        lambda sub: quantity_input_field("cooked", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 반찬 횟수 입력
+                            rx.cond(AppState.show_side_dish,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_side_dish_subs,
+                                        lambda sub: quantity_input_field("side_dish", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 고기 횟수 입력
+                            rx.cond(AppState.show_grilled_meat,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_grilled_meat_subs,
+                                        lambda sub: quantity_input_field("grilled_meat", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 과일 횟수 입력
+                            rx.cond(AppState.show_fruit,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_fruit_subs,
+                                        lambda sub: quantity_input_field("fruit", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            # 파스타 횟수 입력
+                            rx.cond(AppState.show_pasta,
+                                rx.vstack(
+                                    rx.foreach(
+                                        AppState.selected_pasta_subs,
+                                        lambda sub: quantity_input_field("pasta", sub)
+                                    ),
+                                    spacing="2",
+                                    width="100%",
+                                )),
+
+                            rx.box(height="30px"),
+
+                            # 버튼 영역
+                            rx.hstack(
+                                # 다시 선택하기 버튼
+                                rx.button(
+                                    "다시 선택하기",
+                                    type="button",
+                                    on_click=AppState.reset_food_selection,
+                                    color="#4DAB75",
+                                    background_color="transparent",
+                                    border_radius="30px",
+                                    padding="16px 40px",
+                                    border="1px solid rgba(77, 171, 117, 0.3)",
+                                    font_size="1.05em",
+                                    font_weight="600",
+                                    cursor="pointer",
+                                    transition="all 0.25s ease",
+                                    _hover={
+                                        "background_color": "rgba(77, 171, 117, 0.05)",
+                                        "border": "1px solid #4DAB75",
+                                    },
+                                ),
+                                # 제출 버튼
+                                rx.button(
+                                    "다음",
+                                    type="submit",
+                                    color="#FFFFFF",
+                                    background_color="#4DAB75",
+                                    border_radius="30px",
+                                    padding="16px 52px",
+                                    border="none",
+                                    font_size="1.05em",
+                                    font_weight="600",
+                                    cursor="pointer",
+                                    box_shadow="0 4px 20px rgba(77, 171, 117, 0.3)",
+                                    transition="all 0.25s ease",
+                                    _hover={
+                                        "background_color": "#3d9a66",
+                                        "transform": "translateY(-2px)",
+                                        "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.5)",
+                                    },
+                                ),
+                                spacing="4",
+                                justify="center",
                             ),
 
                             align="center",
                             width="100%",
-                            spacing="2",
+                            spacing="3",
+                            padding="20px",
                         ),
                         on_submit=AppState.handle_food_submit,
                     ),
                 ),
 
-                spacing="4",
-                align="center",
-                padding="40px",
+                rx.box(height="20px"),
+
+                # ----------------------------------
+                # 입력하기 버튼 & 건너뛰기 버튼
+                # ----------------------------------
+                rx.cond(
+                    ~AppState.food_input_mode,
+                    rx.hstack(
+                        rx.button(
+                            "건너뛰기",
+                            on_click=rx.redirect("/input/clothing"),
+                            color="#4DAB75",
+                            background_color="transparent",
+                            border_radius="30px",
+                            padding="18px 48px",
+                            border="1px solid rgba(77, 171, 117, 0.3)",
+                            font_size="1.05em",
+                            font_weight="600",
+                            cursor="pointer",
+                            transition="all 0.25s ease",
+                            _hover={
+                                "background_color": "rgba(77, 171, 117, 0.05)",
+                                "border": "1px solid #4DAB75",
+                            },
+                        ),
+                        rx.button(
+                            "입력하기",
+                            on_click=AppState.show_food_input_fields,
+                            color="#FFFFFF",
+                            background_color="#4DAB75",
+                            border_radius="30px",
+                            padding="18px 48px",
+                            border="none",
+                            font_size="1.05em",
+                            font_weight="600",
+                            cursor="pointer",
+                            box_shadow="0 4px 20px rgba(77, 171, 117, 0.3)",
+                            transition="all 0.25s ease",
+                            _hover={
+                                "background_color": "#3d9a66",
+                                "transform": "translateY(-2px)",
+                                "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.5)",
+                            },
+                        ),
+                        spacing="4",
+                        justify="center",
+                    ),
+                ),
+
+                            spacing="5",
+                            align="center",
+                            width="100%",
+                        ),
+                        width="100%",
+                        background="white",
+                        border="1px solid rgba(0,0,0,0.1)",
+                        box_shadow="0 4px 12px rgba(0,0,0,0.1)",
+                        padding="40px",
+                        max_width="1000px",
+                    ),
+                    width="100%",
+                    z_index="2",
+                    padding="40px 20px",
+                    padding_top="20px",
+                    display="flex",
+                    justify_content="center",
+                    align_items="flex-start",
+                    min_height="calc(100vh - 100px)",
+                    margin_top="0",
+                ),
             ),
-            max_width="800px",
-            margin="0 auto",
+            help_modal("식품"),
+        ),
+        rx.box(
+            header(),
+            rx.center(
+                rx.vstack(
+                    rx.heading("로그인이 필요합니다", size="6", color="white"),
+                    rx.button(
+                        "로그인하기",
+                        on_click=rx.redirect("/auth"),
+                        color_scheme="green",
+                        size="3",
+                        margin_top="20px",
+                    ),
+                    spacing="4",
+                    align="center",
+                ),
+                width="100%",
+                min_height="calc(100vh - 80px)",
+            ),
+            spacing="0",
+            width="100%",
+            min_height="100vh",
         ),
     )
