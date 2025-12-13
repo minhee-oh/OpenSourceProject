@@ -234,10 +234,25 @@ def calculate_carbon_emission(
     
     carbon_emission = None
     calculation_method = "local"  # "api" 또는 "local"
+    api_provider = None  # "climatiq" 또는 None
     
     # API 사용 시도 (모든 카테고리 대상, 실패 시 로컬 Fallback)
     if use_api:
-        logger.info(f"[탄소 계산] API 사용 시도 중... (카테고리: {category})")
+        import sys
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        climatiq_key = os.getenv("CLIMATIQ_API_KEY", "")
+        
+        if climatiq_key:
+            sys.stderr.write(f"[탄소 계산] 🌐 외부 API 사용 시도 - Climatiq API (카테고리: {category}, 활동: {activity_type})\n")
+            sys.stderr.flush()
+            logger.info(f"[탄소 계산] 🌐 외부 API 사용 시도 - Climatiq API (카테고리: {category})")
+        else:
+            sys.stderr.write(f"[탄소 계산] ⚠️ API 키 없음 - 로컬 계산으로 전환 (카테고리: {category}, 활동: {activity_type})\n")
+            sys.stderr.flush()
+            logger.warning(f"[탄소 계산] ⚠️ CLIMATIQ_API_KEY가 설정되지 않음, 로컬 계산 사용")
+        
         try:
             carbon_emission = calculate_carbon_with_api(
                 category=category,
@@ -250,18 +265,30 @@ def calculate_carbon_emission(
             )
             if carbon_emission is not None:
                 calculation_method = "api"
-                logger.info(f"[탄소 계산] ✅ API로 계산 완료: {category}/{activity_type} = {carbon_emission}kgCO2e")
+                api_provider = "climatiq"
+                sys.stderr.write(f"[탄소 계산] ✅ 외부 API(Climatiq) 계산 성공: {category}/{activity_type} = {carbon_emission}kgCO2e\n")
+                sys.stderr.flush()
+                logger.info(f"[탄소 계산] ✅ 외부 API(Climatiq) 계산 완료: {category}/{activity_type} = {carbon_emission}kgCO2e")
             else:
+                sys.stderr.write(f"[탄소 계산] ⚠️ API가 None 반환 - 로컬 계산으로 전환 (카테고리: {category}, 활동: {activity_type})\n")
+                sys.stderr.flush()
                 logger.warning(f"[탄소 계산] API가 None 반환, 로컬 계산으로 전환")
         except Exception as e:
+            sys.stderr.write(f"[탄소 계산] ❌ 외부 API(Climatiq) 계산 실패 - 로컬 계산으로 전환: {str(e)} (카테고리: {category}, 활동: {activity_type})\n")
+            sys.stderr.flush()
             logger.warning(f"[탄소 계산] API 계산 실패, 로컬 계산으로 전환: {e}", exc_info=True)
     else:
-        if not use_api:
-            logger.info(f"[탄소 계산] API 사용 비활성화, 로컬 계산 사용")
+        import sys
+        sys.stderr.write(f"[탄소 계산] 📊 로컬 계산 사용 (API 비활성화) - 카테고리: {category}, 활동: {activity_type}\n")
+        sys.stderr.flush()
+        logger.info(f"[탄소 계산] 📊 로컬 계산 사용 (API 비활성화)")
     
     # API 실패 또는 API 비활성화인 경우 로컬 배출 계수 사용
     if carbon_emission is None:
-        logger.info(f"[탄소 계산] 로컬 배출 계수로 계산 시작...")
+        import sys
+        sys.stderr.write(f"[탄소 계산] 📊 로컬 배출 계수로 계산 시작... (카테고리: {category}, 활동: {activity_type})\n")
+        sys.stderr.flush()
+        logger.info(f"[탄소 계산] 📊 로컬 배출 계수로 계산 시작...")
         emission_factor = 0.0
         
         if category == "식품":
@@ -330,10 +357,15 @@ def calculate_carbon_emission(
         "converted_unit": standard_unit,
         "original_value": value,
         "original_unit": unit,
-        "calculation_method": calculation_method  # API 사용 여부 표시
+        "calculation_method": calculation_method,  # "api" 또는 "local"
+        "api_provider": api_provider  # "climatiq" 또는 None
     }
     
-    logger.info(f"[탄소 계산] ✅ 최종 결과: {result['carbon_emission_kg']}kgCO2e (방법: {calculation_method})")
+    import sys
+    method_str = f"외부 API({api_provider})" if calculation_method == "api" and api_provider else "로컬 계산"
+    sys.stderr.write(f"[탄소 계산] ✅ 최종 결과: {result['carbon_emission_kg']}kgCO2e (방법: {method_str}) - 카테고리: {category}, 활동: {activity_type}\n")
+    sys.stderr.flush()
+    logger.info(f"[탄소 계산] ✅ 최종 결과: {result['carbon_emission_kg']}kgCO2e (방법: {method_str})")
     return result
 
 

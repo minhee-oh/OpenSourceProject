@@ -36,6 +36,9 @@ class BattleState(CarbonState):
     대항전 시스템 관련 상태 및 로직
     """
     current_battle: Optional[Dict[str, Any]] = None
+    current_battle_participants: List[Dict[str, Any]] = []
+    college_a_participants: List[Dict[str, Any]] = []  # 단과대 A 참가자 목록 (상위 5명)
+    college_b_participants: List[Dict[str, Any]] = []  # 단과대 B 참가자 목록 (상위 5명)
     battle_bet_amount: int = 0
     battle_error_message: str = ""
     previous_battles: List[Dict[str, Any]] = []  # 저번주 대결 결과
@@ -172,6 +175,7 @@ class BattleState(CarbonState):
                 
                 # 승자 팀에게 포인트 분배 (패자 팀 베팅 포인트 + 자신의 베팅 포인트)
                 if winner_participants and total_winner_bet > 0:
+                    from ..models import PointsLog
                     for participant in winner_participants:
                         # 자신의 베팅 비율에 따라 분배
                         share_ratio = participant.bet_amount / total_winner_bet
@@ -184,10 +188,21 @@ class BattleState(CarbonState):
                         if user:
                             user.current_points += reward
                             session.add(user)
+                            
+                            # 포인트 획득 로그 기록
+                            points_log = PointsLog(
+                                student_id=participant.student_id,
+                                log_date=date.today(),
+                                points=reward,
+                                source="battle_reward",
+                                description=f"대항전 승리 보상 ({battle.college_a} vs {battle.college_b})"
+                            )
+                            session.add(points_log)
                 
                 # 패자 팀은 포인트 손실 (이미 차감되었으므로 추가 작업 없음)
             else:
                 # 무승부: 모든 참가자에게 베팅 포인트 반환
+                from ..models import PointsLog
                 for participant in participants:
                     participant.reward_amount = participant.bet_amount
                     session.add(participant)
@@ -196,6 +211,16 @@ class BattleState(CarbonState):
                     if user:
                         user.current_points += participant.bet_amount
                         session.add(user)
+                        
+                        # 포인트 반환 로그 기록
+                        points_log = PointsLog(
+                            student_id=participant.student_id,
+                            log_date=date.today(),
+                            points=participant.bet_amount,
+                            source="battle_draw",
+                            description=f"대항전 무승부 포인트 반환 ({battle.college_a} vs {battle.college_b})"
+                        )
+                        session.add(points_log)
             
             # 모든 작업(상태 업데이트 + 보상 분배)이 성공적으로 완료된 후에만 커밋
             session.commit()
@@ -290,15 +315,15 @@ class BattleState(CarbonState):
                             )
                         ).all()
                         
-                        # 각 팀의 참가자 수와 총 베팅 포인트 계산
-                        team_a_participants = []
-                        team_b_participants = []
+                        # 각 팀의 고유 참가자 수 계산 (중복 student_id 제거)
+                        team_a_participants: Dict[str, BattleParticipant] = {}
+                        team_b_participants: Dict[str, BattleParticipant] = {}
                         for p in participants_a:
                             user_college = self._get_user_college(p.student_id, session)
                             if user_college == battle.college_a:
-                                team_a_participants.append(p)
+                                team_a_participants[p.student_id] = p
                             elif user_college == battle.college_b:
-                                team_b_participants.append(p)
+                                team_b_participants[p.student_id] = p
                         
                         self.current_battle = {
                             "id": battle.id,
@@ -311,9 +336,62 @@ class BattleState(CarbonState):
                             "start_date": battle.start_date.strftime("%Y-%m-%d") if battle.start_date else "",
                             "end_date": battle.end_date.strftime("%Y-%m-%d") if battle.end_date else ""
                         }
+                        # 참가자 전체 목록 저장 (학번별 총 베팅 합산)
+                        participant_list = []
+                        bet_sum_map: Dict[str, int] = {}
+                        for p in participants_a:
+                            bet_sum_map[p.student_id] = bet_sum_map.get(p.student_id, 0) + p.bet_amount
+                        
+                        # 단과대별로 그룹화
+                        participants_by_college_dict: Dict[str, List[Dict[str, Any]]] = {}
+                        for sid, total_bet in bet_sum_map.items():
+                            # 사용자 정보 조회하여 닉네임과 단과대 가져오기
+                            user = session.exec(
+                                select(User).where(User.student_id == sid)
+                            ).first()
+                            nickname = user.nickname if user else sid
+                            college = user.college if user else "기타"
+                            
+                            participant_data = {
+                                "student_id": sid,
+                                "nickname": nickname,
+                                "bet_amount": total_bet,
+                            }
+                            
+                            # 단과대별로 그룹화
+                            if college not in participants_by_college_dict:
+                                participants_by_college_dict[college] = []
+                            participants_by_college_dict[college].append(participant_data)
+                        
+                        # 각 단과대별로 베팅 포인트 기준 내림차순 정렬 후 상위 5명만 선택
+                        college_a_list = participants_by_college_dict.get(battle.college_a, [])
+                        college_b_list = participants_by_college_dict.get(battle.college_b, [])
+                        
+                        # 단과대 A 상위 5명
+                        sorted_a = sorted(college_a_list, key=lambda x: x["bet_amount"], reverse=True)
+                        top_a = []
+                        for idx, p in enumerate(sorted_a[:5], 1):
+                            p_with_rank = p.copy()
+                            p_with_rank["rank"] = idx
+                            top_a.append(p_with_rank)
+                        
+                        # 단과대 B 상위 5명
+                        sorted_b = sorted(college_b_list, key=lambda x: x["bet_amount"], reverse=True)
+                        top_b = []
+                        for idx, p in enumerate(sorted_b[:5], 1):
+                            p_with_rank = p.copy()
+                            p_with_rank["rank"] = idx
+                            top_b.append(p_with_rank)
+                        
+                        self.college_a_participants = top_a
+                        self.college_b_participants = top_b
+                        self.current_battle_participants = participant_list
                         return
                 
                 self.current_battle = None
+                self.current_battle_participants = []
+                self.college_a_participants = []
+                self.college_b_participants = []
                 
         except Exception as e:
             logger.error(f"대항전 로드 오류: {e}", exc_info=True)
@@ -371,6 +449,17 @@ class BattleState(CarbonState):
                 user.current_points -= self.battle_bet_amount
                 self.current_user_points = user.current_points
                 session.add(user)
+                
+                # 포인트 차감 로그 기록
+                from ..models import PointsLog
+                points_log = PointsLog(
+                    student_id=self.current_user_id,
+                    log_date=date.today(),
+                    points=-self.battle_bet_amount,  # 음수로 기록
+                    source="battle_participation",
+                    description=f"대항전 참가 ({self.current_battle.get('college_a', '')} vs {self.current_battle.get('college_b', '')})"
+                )
+                session.add(points_log)
                 
                 # 참가자 등록
                 participant = BattleParticipant(
@@ -462,6 +551,7 @@ class BattleState(CarbonState):
                     result.append({
                         "rank": rank,
                         "student_id": user.student_id,
+                        "nickname": user.nickname,
                         "college": user.college,
                         "points": user.current_points
                     })

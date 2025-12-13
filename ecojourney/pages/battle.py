@@ -1,130 +1,8 @@
 # battle.py - 단과대별 대결 페이지
 
 import reflex as rx
-from ecojourney.state import AppState
-
-
-def header() -> rx.Component:
-    return rx.box(
-        rx.hstack(
-            # 로고 버튼
-            rx.button(
-                "ECOJOURNEY",
-                on_click=rx.redirect("/"),
-                background_color="transparent",
-                color="#FFFFFF",
-                font_size="1.5em",
-                font_weight="bold",
-                padding="0",
-                border="none",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-
-            # 로그인 상태에 따른 메뉴
-            rx.cond(
-                AppState.is_logged_in,
-                rx.hstack(
-                    rx.button(
-                        "챌린지",
-                        on_click=rx.redirect("/info"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "배틀",
-                        on_click=rx.redirect("/battle"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="1px solid #FFFFFF",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                    ),
-                    rx.button(
-                        "랭킹",
-                        on_click=rx.redirect("/ranking"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "리포트",
-                        on_click=rx.redirect("/intro"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.text(
-                        f"{AppState.current_user_id}님",
-                        color="#FFFFFF",
-                        font_size="1em",
-                        margin_right="10px",
-                    ),
-                    rx.button(
-                        "마이페이지",
-                        on_click=rx.redirect("/mypage"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "로그아웃",
-                        on_click=AppState.logout,
-                        background_color="#FFFFFF",
-                        color="#4DAB75",
-                        border="1px solid #4DAB75",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                    ),
-                    spacing="3",
-                    align="center",
-                ),
-
-                # 로그인 안 된 상태 → 로그인 버튼
-                rx.button(
-                    "로그인",
-                    on_click=rx.redirect("/auth"),
-                    background_color="#FFFFFF",
-                    color="#4DAB75",
-                    border="1px solid #4DAB75",
-                    border_radius="25px",
-                    padding="8px 20px",
-                    font_weight="500",
-                    _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                ),
-            ),
-
-            justify="between",
-            align="center",
-            padding="1.5em 3em",
-        ),
-
-        width="100%",
-        position="relative",
-        z_index="10",
-        background_color="#4DAB75",
-        border_bottom="1px solid rgba(255, 255, 255, 0.1)",
-    )
+from ..states import AppState
+from .common_header import header
 
 
 def battle_page() -> rx.Component:
@@ -133,7 +11,8 @@ def battle_page() -> rx.Component:
         AppState.is_logged_in,
         rx.box(
             header(),
-
+            # 헤더 공간 확보
+            rx.box(height="100px"),
         # fade-in 애니메이션을 위한 CSS 삽입
         rx.html("""
         <style>
@@ -240,103 +119,189 @@ def battle_page() -> rx.Component:
                     # -------------------------------------------------------
                     rx.cond(
                         AppState.current_battle != None,
-                        rx.card(
-                            rx.vstack(
-                                rx.heading("현재 대결", size="7", color="#333333", margin_bottom="20px"),
-
-                                # A팀 vs B팀
-                                rx.hstack(
-                                    # 왼쪽 단과대
-                                    rx.vstack(
-                                        rx.text(
-                                            AppState.current_battle["college_a"],
-                                            size="6",
-                                            font_weight="bold",
-                                            color="blue.600",
+                        rx.box(
+                            rx.card(
+                                rx.vstack(
+                                    rx.heading("현재 대결", size="7", color="#333333", margin_bottom="20px"),
+                                    rx.hstack(
+                                        rx.vstack(
+                                            rx.text(AppState.current_battle["college_a"], size="6", font_weight="bold", color="blue.600"),
+                                            rx.text(f"총 포인트: {AppState.current_battle['score_a']}", size="5", color="#333333", font_weight="bold"),
+                                            rx.text(f"참가 인원: {AppState.current_battle['participants_a']}명", size="5", color="gray.600", font_weight="bold"),
+                                            align="center",
+                                            spacing="2",
                                         ),
-                                        rx.text(
-                                            f"총 포인트: {AppState.current_battle['score_a']}",
-                                            size="4",
-                                            color="#333333",
+                                        rx.text("VS", size="7", font_weight="bold", color="#4DAB75", margin_x="30px"),
+                                        rx.vstack(
+                                            rx.text(AppState.current_battle["college_b"], size="6", font_weight="bold", color="red.600"),
+                                            rx.text(f"총 포인트: {AppState.current_battle['score_b']}", size="5", color="#333333", font_weight="bold"),
+                                            rx.text(f"참가 인원: {AppState.current_battle['participants_b']}명", size="5", color="gray.600", font_weight="bold"),
+                                            align="center",
+                                            spacing="2",
                                         ),
-                                        rx.text(
-                                            f"참가 인원: {AppState.current_battle['participants_a']}명",
-                                            size="3",
-                                            color="gray.600",
-                                        ),
+                                        justify="center",
                                         align="center",
                                         spacing="2",
                                     ),
-
-                                    rx.text("VS", size="7", font_weight="bold", color="#4DAB75", margin_x="30px"),
-
-                                    # 오른쪽 단과대
-                                    rx.vstack(
-                                        rx.text(
-                                            AppState.current_battle["college_b"],
-                                            size="6",
-                                            font_weight="bold",
-                                            color="red.600",
-                                        ),
-                                        rx.text(
-                                            f"총 포인트: {AppState.current_battle['score_b']}",
-                                            size="4",
-                                            color="#333333",
-                                        ),
-                                        rx.text(
-                                            f"참가 인원: {AppState.current_battle['participants_b']}명",
-                                            size="3",
-                                            color="gray.600",
-                                        ),
-                                        align="center",
-                                        spacing="2",
-                                    ),
-
-                                    justify="center",
                                     align="center",
+                                    justify="center",
                                     width="100%",
+                                    margin_y="20px",
                                 ),
-
                                 rx.divider(margin_y="15px"),
-
-                                # 기간 표시
                                 rx.text(
                                     f"기간: {AppState.current_battle['start_date']} ~ {AppState.current_battle['end_date']}",
-                                    size="3",
-                                    color="gray.600",
+                                    size="5",
+                                    color="gray.300",
+                                    font_weight="bold",
                                 ),
+                                spacing="4",
+                                padding="20px",
                             ),
                             width="100%",
-                            background="white",
-                            border="1px solid rgba(0,0,0,0.1)",
-                            box_shadow="0 4px 12px rgba(0,0,0,0.1)",
-                            padding="30px",
-                            margin_bottom="30px",
+                            background="rgba(255, 255, 255, 0.1)",
+                            border="1px solid rgba(255, 255, 255, 0.2)",
+                            border_radius="12px",
+                            padding="8px",
                         ),
-
-                        # 대결이 없을 때
-                        rx.card(
-                            rx.vstack(
-                                rx.text("현재 진행 중인 대결이 없습니다.", size="4", color="gray.700"),
-                                rx.text(
-                                    "매주 월요일 새로운 대결이 생성됩니다.",
-                                    size="3",
-                                    color="gray.600",
-                                    margin_top="10px",
-                                ),
-                                align="center",
-                                padding="40px",
-                            ),
-                            width="100%",
-                            background="white",
-                            border="1px solid rgba(0,0,0,0.1)",
-                            box_shadow="0 4px 12px rgba(0,0,0,0.1)",
-                            margin_bottom="30px",
-                        )
                     ),
-                    # -------------------------------------------------------
-                    # ⭐ 대결 참가 (베팅 UI)
-                    # -------------------------------------------------------
+                    
+                    # 단과대별 참가자 목록 (상위 5명)
+                    rx.cond(
+                        AppState.current_battle != None,
+                        rx.hstack(
+                            # 단과대 A 참가자 목록
+                            rx.card(
+                                rx.vstack(
+                                    rx.heading(
+                                        AppState.current_battle["college_a"],
+                                        size="6",
+                                        color="blue.600",
+                                        margin_bottom="15px",
+                                    ),
+                                    rx.cond(
+                                        AppState.college_a_participants.length() > 0,
+                                        rx.vstack(
+                                            rx.foreach(
+                                                AppState.college_a_participants,
+                                                lambda p: rx.hstack(
+                                                    rx.text(
+                                                        f"{p['rank']}위",
+                                                        width="50px",
+                                                        font_weight="bold",
+                                                        color="#4DAB75",
+                                                    ),
+                                                    rx.text(
+                                                        p["nickname"],
+                                                        width="150px",
+                                                        font_weight="bold",
+                                                        color="#333333",
+                                                    ),
+                                                    rx.text(
+                                                        f"{p['bet_amount']:,}점",
+                                                        width="100px",
+                                                        color="#4DAB75",
+                                                        font_weight="bold",
+                                                    ),
+                                                    spacing="3",
+                                                    align="center",
+                                                    width="100%",
+                                                    padding="8px",
+                                                    border_radius="8px",
+                                                    background=rx.cond(
+                                                        p["rank"] == 1,
+                                                        "rgba(77, 171, 117, 0.15)",
+                                                        "rgba(77, 171, 117, 0.05)",
+                                                    ),
+                                                ),
+                                            ),
+                                            spacing="2",
+                                            width="100%",
+                                        ),
+                                        rx.text(
+                                            "아직 참가자가 없습니다.",
+                                            color="gray.600",
+                                            size="3",
+                                        ),
+                                    ),
+                                    spacing="3",
+                                ),
+                                padding="20px",
+                                border="1px solid rgba(255, 255, 255, 0.2)",
+                                background="rgba(255, 255, 255, 0.1)",
+                                flex="1",
+                                min_width="300px",
+                            ),
+                            # 단과대 B 참가자 목록
+                            rx.card(
+                                rx.vstack(
+                                    rx.heading(
+                                        AppState.current_battle["college_b"],
+                                        size="6",
+                                        color="red.600",
+                                        margin_bottom="15px",
+                                    ),
+                                    rx.cond(
+                                        AppState.college_b_participants.length() > 0,
+                                        rx.vstack(
+                                            rx.foreach(
+                                                AppState.college_b_participants,
+                                                lambda p: rx.hstack(
+                                                    rx.text(
+                                                        f"{p['rank']}위",
+                                                        width="50px",
+                                                        font_weight="bold",
+                                                        color="#4DAB75",
+                                                    ),
+                                                    rx.text(
+                                                        p["nickname"],
+                                                        width="150px",
+                                                        font_weight="bold",
+                                                        color="#333333",
+                                                    ),
+                                                    rx.text(
+                                                        f"{p['bet_amount']:,}점",
+                                                        width="100px",
+                                                        color="#4DAB75",
+                                                        font_weight="bold",
+                                                    ),
+                                                    spacing="3",
+                                                    align="center",
+                                                    width="100%",
+                                                    padding="8px",
+                                                    border_radius="8px",
+                                                    background=rx.cond(
+                                                        p["rank"] == 1,
+                                                        "rgba(77, 171, 117, 0.15)",
+                                                        "rgba(77, 171, 117, 0.05)",
+                                                    ),
+                                                ),
+                                            ),
+                                            spacing="2",
+                                            width="100%",
+                                        ),
+                                        rx.text(
+                                            "아직 참가자가 없습니다.",
+                                            color="gray.600",
+                                            size="3",
+                                        ),
+                                    ),
+                                    spacing="3",
+                                ),
+                                padding="20px",
+                                border="1px solid rgba(255, 255, 255, 0.2)",
+                                background="rgba(255, 255, 255, 0.1)",
+                                flex="1",
+                                min_width="300px",
+                            ),
+                            spacing="4",
+                            width="100%",
+                            align="stretch",
+                            justify="center",
+                        ),
+                    ),
+                    
+                    # 참가 폼
                     rx.card(
                         rx.vstack(
                             rx.heading("대결 참가", size="6", color="#333333", margin_bottom="15px"),

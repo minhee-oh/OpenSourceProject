@@ -24,39 +24,43 @@ from .pages.ranking import ranking_page
 app = rx.App()
 
 # 1. 메인 홈 화면 라우팅 (EcoJourney.py 파일 내 home_page 함수 사용)
-# on_load에서 세션 복원 체크
-app.add_page(home_page, route="/", title="ECOJOURNEY", on_load=AppState.check_and_restore_session)
+app.add_page(home_page, route="/", title="EcoJourney | 시작", on_load=AppState.hydrate_auth)
 
-# 2. 리포트 시작 화면 라우팅
-app.add_page(intro_page, route="/intro", title="ECOJOURNEY | 리포트", on_load=AppState.check_and_restore_session)
-# 2-1. 챌린지 페이지
-app.add_page(info_page, route="/info", title="ECOJOURNEY | 챌린지", on_load=[AppState.check_and_restore_session, AppState.load_active_challenges])
+# 2. 서비스 소개 화면 라우팅
+app.add_page(intro_page, route="/intro", title="EcoJourney | 소개", on_load=AppState.hydrate_auth)
+# 2-1. 정보글 페이지
+app.add_page(
+    info_page,
+    route="/info",
+    title="EcoJourney | 정보글",
+    on_load=[AppState.hydrate_auth, AppState.load_active_challenges, AppState.load_daily_content, AppState.load_quiz_state],
+)
 
 # 2-1. 로그인/회원가입 화면 라우팅
-app.add_page(auth_page, route="/auth", title="ECOJOURNEY | 로그인")
+app.add_page(auth_page, route="/auth", title="EcoJourney | 로그인", on_load=AppState.hydrate_auth)
 
 # 3. 카테고리 입력 화면 라우팅 (CATEGORY_CONFIG 기반 자동 등록)
-app.add_page(transportation_page, route="/input/transportation", title="ECOJOURNEY | 교통")
-app.add_page(food_page, route="/input/food", title="ECOJOURNEY | 식품")
-app.add_page(clothing_page, route="/input/clothing", title="ECOJOURNEY | 의류")
-app.add_page(electricity_page, route="/input/electricity", title="ECOJOURNEY | 전기")
-app.add_page(waste_page, route="/input/waste", title="ECOJOURNEY | 쓰레기")
-app.add_page(water_page, route="/input/water", title="ECOJOURNEY | 물")
+app.add_page(transportation_page, route="/input/transportation", title="EcoJourney | 교통", on_load=AppState.hydrate_auth)
+app.add_page(food_page, route="/input/food", title="EcoJourney | 식품", on_load=AppState.hydrate_auth)
+app.add_page(clothing_page, route="/input/clothing", title="EcoJourney | 의류", on_load=AppState.hydrate_auth)
+app.add_page(electricity_page, route="/input/electricity", title="EcoJourney | 전기", on_load=AppState.hydrate_auth)
+app.add_page(waste_page, route="/input/waste", title="EcoJourney | 쓰레기", on_load=AppState.hydrate_auth)
+app.add_page(water_page, route="/input/water", title="EcoJourney | 물", on_load=AppState.hydrate_auth)
 
 
 # 4. 결과 리포트 화면 라우팅
-app.add_page(report_page, route="/report", title="ECOJOURNEY | 결과 리포트")
+app.add_page(report_page, route="/report", title="EcoJourney | 결과 리포트", on_load=[AppState.hydrate_auth, AppState.on_report_page_load])
 
 # 5. 마이페이지 라우팅
-app.add_page(mypage_page, route="/mypage", title="ECOJOURNEY | 마이페이지", on_load=[AppState.check_and_restore_session, AppState.load_mypage_data])
+app.add_page(mypage_page, route="/mypage", title="EcoJourney | 마이페이지", on_load=[AppState.hydrate_auth, AppState.load_mypage_data])
 
-# 6. 배틀 페이지 라우팅
-app.add_page(battle_page, route="/battle", title="ECOJOURNEY | 배틀", on_load=[AppState.check_and_restore_session, AppState.load_current_battle])
+# 6. 단과대 대결 페이지 라우팅
+app.add_page(battle_page, route="/battle", title="EcoJourney | 단과대 대결", on_load=[AppState.hydrate_auth, AppState.load_current_battle])
 
 # 7. 저번주 랭킹 페이지 라우팅
 app.add_page(
-    ranking_page,
-    route="/ranking",
-    title="ECOJOURNEY | 랭킹",
-    on_load=[AppState.check_and_restore_session, AppState.load_ranking_data]
+    ranking_page, 
+    route="/ranking", 
+    title="EcoJourney | 랭킹", 
+    on_load=[AppState.hydrate_auth, AppState.load_ranking_data]
 )

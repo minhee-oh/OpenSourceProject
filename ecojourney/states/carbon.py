@@ -25,6 +25,9 @@ class CarbonState(AuthState):
     saved_logs_history: List[Dict[str, Any]] = []
     has_today_log: bool = False  # 오늘 날짜에 저장된 로그가 있는지
     
+    # 정책/혜택 후보 (LLM은 이 목록 안에서만 선택)
+    policy_candidates: List[Dict[str, str]] = []
+    
     # ---------- 교통수단 선택 상태 ----------
     selected_car: bool = False
     selected_bus: bool = False
@@ -78,7 +81,7 @@ class CarbonState(AuthState):
     selected_grilled_meat_subs: List[str] = []
     selected_fruit_subs: List[str] = []
     selected_pasta_subs: List[str] = []
-    
+
     # ---------- 의류 선택 상태 ----------
     selected_tshirts: bool = False
     selected_jeans: bool = False
@@ -101,17 +104,6 @@ class CarbonState(AuthState):
 
     electricity_input_mode: bool = False
 
-    # ---------- 물 선택 상태 ----------
-    selected_shower: bool = False
-    selected_dish: bool = False
-    selected_laundry: bool = False
-
-    show_shower: bool = False
-    show_dish: bool = False
-    show_laundry: bool = False
-
-    water_input_mode: bool = False
-
     # ---------- 쓰레기 선택 상태 ----------
     selected_general: bool = False
     selected_plastic: bool = False
@@ -126,10 +118,17 @@ class CarbonState(AuthState):
     show_can: bool = False
 
     waste_input_mode: bool = False
-    
-    # ---------- 리포트 페이지 UI 상태 ----------
-    show_analysis_detail: bool = False
-    show_suggestions_detail: bool = False
+
+    # ---------- 물 선택 상태 ----------
+    selected_shower: bool = False
+    selected_dish: bool = False
+    selected_laundry: bool = False
+
+    show_shower: bool = False
+    show_dish: bool = False
+    show_laundry: bool = False
+
+    water_input_mode: bool = False
     
     # ------------------------------ 교통 관련 메서드 ------------------------------
     
@@ -171,8 +170,13 @@ class CarbonState(AuthState):
         self.show_walk = False
         self.show_bike = False
     
-    def handle_transport_submit(self, form_data: dict):
+    async def handle_transport_submit(self, form_data: dict):
         """교통 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[교통 제출] handle_transport_submit 호출됨\n")
+        sys.stderr.write(f"[교통 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 교통 데이터 제거
         self.all_activities = [
             act for act in self.all_activities 
@@ -222,6 +226,11 @@ class CarbonState(AuthState):
             })
         
         self.all_activities = self.all_activities + transport_data
+        import sys
+        sys.stderr.write(f"[교통 제출] transport_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[교통 제출] transport_data: {transport_data}\n")
+        sys.stderr.write(f"[교통 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
         
         # 입력모드 종료 + 선택 초기화
         self.trans_input_mode = False
@@ -236,7 +245,7 @@ class CarbonState(AuthState):
         self.show_walk = False
         self.show_bike = False
         
-        return rx.redirect("/input/food")
+        yield rx.redirect("/input/food")
     
     # ------------------------------ 식품 관련 메서드 ------------------------------
     
@@ -377,14 +386,19 @@ class CarbonState(AuthState):
         self.selected_fruit_subs = []
         self.selected_pasta_subs = []
 
-    def handle_food_submit(self, form_data: dict):
+    async def handle_food_submit(self, form_data: dict):
         """음식 입력값 제출 처리 (다중 선택 지원)"""
+        import sys
+        sys.stderr.write(f"[식품 제출] handle_food_submit 호출됨\n")
+        sys.stderr.write(f"[식품 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 음식 데이터 제거
         self.all_activities = [
-            act for act in self.all_activities
+            act for act in self.all_activities 
             if act.get("category") != "식품"
         ]
-
+        
         food_data = []
 
         # 유제품 처리
@@ -516,6 +530,11 @@ class CarbonState(AuthState):
                     })
 
         self.all_activities = self.all_activities + food_data
+        import sys
+        sys.stderr.write(f"[식품 제출] food_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[식품 제출] food_data: {food_data}\n")
+        sys.stderr.write(f"[식품 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
 
         # 입력모드 종료 + 선택 초기화
         self.food_input_mode = False
@@ -551,7 +570,7 @@ class CarbonState(AuthState):
         self.selected_fruit_subs = []
         self.selected_pasta_subs = []
 
-        return rx.redirect("/input/clothing")
+        yield rx.redirect("/input/clothing")
     
     # ------------------------------ 의류 관련 메서드 ------------------------------
     
@@ -587,8 +606,13 @@ class CarbonState(AuthState):
         self.show_shoes = False
         self.show_acc = False
     
-    def handle_clothing_submit(self, form_data: dict):
+    async def handle_clothing_submit(self, form_data: dict):
         """의류 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[의류 제출] handle_clothing_submit 호출됨\n")
+        sys.stderr.write(f"[의류 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 의류 데이터 제거
         self.all_activities = [
             act for act in self.all_activities 
@@ -602,7 +626,7 @@ class CarbonState(AuthState):
                 "category": "의류",
                 "activity_type": "티셔츠",
                 "value": float(form_data.get("tshirts_value", 0)),
-                "sub": form_data.get("tshirts_sub", ""),
+                "sub_category": form_data.get("tshirts_sub", ""),
             })
         
         if self.show_jeans and form_data.get("jeans_value"):
@@ -610,7 +634,7 @@ class CarbonState(AuthState):
                 "category": "의류",
                 "activity_type": "청바지",
                 "value": float(form_data.get("jeans_value", 0)),
-                "sub": form_data.get("jeans_sub", ""),
+                "sub_category": form_data.get("jeans_sub", ""),
             })
         
         if self.show_shoes and form_data.get("shoes_value"):
@@ -618,7 +642,7 @@ class CarbonState(AuthState):
                 "category": "의류",
                 "activity_type": "신발",
                 "value": float(form_data.get("shoes_value", 0)),
-                "sub": form_data.get("shoes_sub", ""),
+                "sub_category": form_data.get("shoes_sub", ""),
             })
         
         if self.show_acc and form_data.get("acc_value"):
@@ -626,10 +650,15 @@ class CarbonState(AuthState):
                 "category": "의류",
                 "activity_type": "가방/잡화",
                 "value": float(form_data.get("acc_value", 0)),
-                "sub": form_data.get("acc_sub", ""),
+                "sub_category": form_data.get("acc_sub", ""),
             })
         
         self.all_activities = self.all_activities + clothing_data
+        import sys
+        sys.stderr.write(f"[의류 제출] clothing_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[의류 제출] clothing_data: {clothing_data}\n")
+        sys.stderr.write(f"[의류 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
         
         # 입력모드 종료 + 선택 초기화
         self.clothing_input_mode = False
@@ -642,7 +671,7 @@ class CarbonState(AuthState):
         self.show_shoes = False
         self.show_acc = False
         
-        return rx.redirect("/input/electricity")
+        yield rx.redirect("/input/electricity")
     
     # ------------------------------ 전기 관련 메서드 ------------------------------
     
@@ -666,8 +695,13 @@ class CarbonState(AuthState):
         self.show_ac = False
         self.show_heater = False
     
-    def handle_electricity_submit(self, form_data: dict):
+    async def handle_electricity_submit(self, form_data: dict):
         """전기 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+        import sys
+        sys.stderr.write(f"[전기 제출] handle_electricity_submit 호출됨\n")
+        sys.stderr.write(f"[전기 제출] form_data: {form_data}\n")
+        sys.stderr.flush()
+        
         # 기존 전기 데이터 제거
         self.all_activities = [
             act for act in self.all_activities 
@@ -691,6 +725,11 @@ class CarbonState(AuthState):
             })
         
         self.all_activities = self.all_activities + electricity_data
+        import sys
+        sys.stderr.write(f"[전기 제출] electricity_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[전기 제출] electricity_data: {electricity_data}\n")
+        sys.stderr.write(f"[전기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
         
         # 입력모드 종료 + 선택 초기화
         self.electricity_input_mode = False
@@ -699,82 +738,7 @@ class CarbonState(AuthState):
         self.show_ac = False
         self.show_heater = False
         
-        return rx.redirect("/input/water")
-    
-    # ------------------------------ 물 관련 메서드 ------------------------------
-    
-    def toggle_shower(self):
-        self.selected_shower = not self.selected_shower
-    
-    def toggle_dish(self):
-        self.selected_dish = not self.selected_dish
-    
-    def toggle_laundry(self):
-        self.selected_laundry = not self.selected_laundry
-    
-    def show_water_input_fields(self):
-        """선택된 항목들의 입력 필드를 표시"""
-        self.show_shower = self.selected_shower
-        self.show_dish = self.selected_dish
-        self.show_laundry = self.selected_laundry
-        self.water_input_mode = True
-
-    def reset_water_selection(self):
-        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
-        self.water_input_mode = False
-        self.selected_shower = False
-        self.selected_dish = False
-        self.selected_laundry = False
-        self.show_shower = False
-        self.show_dish = False
-        self.show_laundry = False
-    
-    def handle_water_submit(self, form_data: dict):
-        """물 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
-        # 기존 물 데이터 제거
-        self.all_activities = [
-            act for act in self.all_activities 
-            if act.get("category") != "물"
-        ]
-        
-        water_data = []
-        
-        if self.show_shower and form_data.get("shower_value"):
-            water_data.append({
-                "category": "물",
-                "activity_type": "샤워",
-                "value": float(form_data.get("shower_value", 0)),
-                "unit": form_data.get("shower_unit", "회"),
-            })
-        
-        if self.show_dish and form_data.get("dish_value"):
-            water_data.append({
-                "category": "물",
-                "activity_type": "설거지",
-                "value": float(form_data.get("dish_value", 0)),
-                "unit": "회",
-            })
-        
-        if self.show_laundry and form_data.get("laundry_value"):
-            water_data.append({
-                "category": "물",
-                "activity_type": "세탁",
-                "value": float(form_data.get("laundry_value", 0)),
-                "unit": "회",
-            })
-        
-        self.all_activities = self.all_activities + water_data
-        
-        # 입력모드 종료 + 선택 초기화
-        self.water_input_mode = False
-        self.selected_shower = False
-        self.selected_dish = False
-        self.selected_laundry = False
-        self.show_shower = False
-        self.show_dish = False
-        self.show_laundry = False
-        
-        return rx.redirect("/input/waste")
+        yield rx.redirect("/input/water")
     
     # ------------------------------ 쓰레기 관련 메서드 ------------------------------
     
@@ -795,15 +759,19 @@ class CarbonState(AuthState):
     
     def show_waste_input_fields(self):
         """선택된 항목들의 입력 필드를 표시"""
+        print(f"[쓰레기] show_waste_input_fields 호출됨")
+        print(f"[쓰레기] 선택된 항목: general={self.selected_general}, plastic={self.selected_plastic}, paper={self.selected_paper}, glass={self.selected_glass}, can={self.selected_can}")
         self.show_general = self.selected_general
         self.show_plastic = self.selected_plastic
         self.show_paper = self.selected_paper
         self.show_glass = self.selected_glass
         self.show_can = self.selected_can
         self.waste_input_mode = True
+        print(f"[쓰레기] waste_input_mode를 True로 설정함")
 
     def reset_waste_selection(self):
         """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        print(f"[쓰레기] reset_waste_selection 호출됨")
         self.waste_input_mode = False
         self.selected_general = False
         self.selected_plastic = False
@@ -816,8 +784,38 @@ class CarbonState(AuthState):
         self.show_glass = False
         self.show_can = False
     
-    def handle_waste_submit(self, form_data: dict):
-        """쓰레기 입력값 폼 제출 -> 데이터 저장 -> 다음 페이지 이동"""
+    def handle_waste_submit_direct(self):
+        """쓰레기 입력값 직접 제출 (form 제출 강제)"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit_direct 호출됨\n")
+        sys.stderr.flush()
+        
+        # JavaScript로 form 제출 강제
+        return rx.call_script("""
+            (function() {
+                const form = document.getElementById('waste-form');
+                if (!form) {
+                    console.error('waste-form을 찾을 수 없습니다');
+                    return;
+                }
+                console.log('form 제출 강제 시도');
+                // form 제출 강제
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                form.dispatchEvent(submitEvent);
+            })()
+        """)
+    
+    async def handle_waste_submit_from_script(self, form_data: dict):
+        """스크립트에서 수집한 form 데이터로 쓰레기 제출 처리"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit_from_script 호출됨\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 타입: {type(form_data)}\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 내용: {form_data}\n")
+        sys.stderr.flush()
+        
+        if not form_data:
+            form_data = {}
+        
         # 기존 쓰레기 데이터 제거
         self.all_activities = [
             act for act in self.all_activities 
@@ -867,6 +865,11 @@ class CarbonState(AuthState):
             })
         
         self.all_activities = self.all_activities + waste_data
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] waste_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[쓰레기 제출] waste_data: {waste_data}\n")
+        sys.stderr.write(f"[쓰레기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
         
         # 입력모드 종료 + 선택 초기화
         self.waste_input_mode = False
@@ -881,50 +884,196 @@ class CarbonState(AuthState):
         self.show_glass = False
         self.show_can = False
         
-        return rx.redirect("/report")
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[쓰레기 제출] 리포트로 리다이렉트 시도...")
+        print(f"[쓰레기 제출] 최종 all_activities: {self.all_activities}")
+        
+        # 리포트로 이동 (리포트 페이지에서 on_report_page_load가 자동으로 계산 수행)
+        import sys
+        sys.stdout.flush()
+        yield rx.redirect("/report")
     
-    # ------------------------------ 리포트 페이지 UI 관련 메서드 ------------------------------
+    async def handle_waste_submit(self, form_data: dict):
+        """쓰레기 입력값 폼 제출 -> 데이터 저장 -> 리포트로 이동"""
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] handle_waste_submit 호출됨\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 타입: {type(form_data)}\n")
+        sys.stderr.write(f"[쓰레기 제출] form_data 내용: {form_data}\n")
+        sys.stderr.flush()
+        
+        # 기존 쓰레기 데이터 제거
+        self.all_activities = [
+            act for act in self.all_activities 
+            if act.get("category") != "쓰레기"
+        ]
+        
+        waste_data = []
+        
+        if self.show_general and form_data.get("general_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "일반쓰레기",
+                "value": float(form_data.get("general_value", 0)),
+                "unit": form_data.get("general_unit", "개"),
+            })
+        
+        if self.show_plastic and form_data.get("plastic_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "플라스틱",
+                "value": float(form_data.get("plastic_value", 0)),
+                "unit": form_data.get("plastic_unit", "개"),
+            })
+        
+        if self.show_paper and form_data.get("paper_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "종이",
+                "value": float(form_data.get("paper_value", 0)),
+                "unit": form_data.get("paper_unit", "개"),
+            })
+        
+        if self.show_glass and form_data.get("glass_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "유리",
+                "value": float(form_data.get("glass_value", 0)),
+                "unit": form_data.get("glass_unit", "개"),
+            })
+        
+        if self.show_can and form_data.get("can_value"):
+            waste_data.append({
+                "category": "쓰레기",
+                "activity_type": "캔",
+                "value": float(form_data.get("can_value", 0)),
+                "unit": form_data.get("can_unit", "개"),
+            })
+        
+        self.all_activities = self.all_activities + waste_data
+        import sys
+        sys.stderr.write(f"[쓰레기 제출] waste_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[쓰레기 제출] waste_data: {waste_data}\n")
+        sys.stderr.write(f"[쓰레기 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.waste_input_mode = False
+        self.selected_general = False
+        self.selected_plastic = False
+        self.selected_paper = False
+        self.selected_glass = False
+        self.selected_can = False
+        self.show_general = False
+        self.show_plastic = False
+        self.show_paper = False
+        self.show_glass = False
+        self.show_can = False
+        
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[쓰레기 제출] 리포트로 리다이렉트 시도...")
+        print(f"[쓰레기 제출] 최종 all_activities: {self.all_activities}")
+        
+        # 리포트로 이동 (리포트 페이지에서 on_report_page_load가 자동으로 계산 수행)
+        import sys
+        sys.stdout.flush()
+        yield rx.redirect("/report")
     
-    @rx.var
-    def average_bar_height(self) -> int:
-        """한국인 평균 막대 높이 계산"""
-        if not self.total_average_comparison:
-            return 130
-        avg = float(self.total_average_comparison.get('average', 0) or 0)
-        user = float(self.total_average_comparison.get('user', 0) or 0)
-        max_val = max(avg, user, 1)
-        return int((avg / max_val) * 130)
+    # ------------------------------ 물 관련 메서드 ------------------------------
+    
+    def toggle_shower(self):
+        self.selected_shower = not self.selected_shower
+    
+    def toggle_dish(self):
+        self.selected_dish = not self.selected_dish
+    
+    def toggle_laundry(self):
+        self.selected_laundry = not self.selected_laundry
+    
+    def show_water_input_fields(self):
+        """선택된 항목들의 입력 필드를 표시"""
+        self.show_shower = self.selected_shower
+        self.show_dish = self.selected_dish
+        self.show_laundry = self.selected_laundry
+        self.water_input_mode = True
 
-    @rx.var
-    def user_bar_height(self) -> int:
-        """사용자 배출량 막대 높이 계산"""
-        if not self.total_average_comparison:
-            return 0
-        avg = float(self.total_average_comparison.get('average', 0) or 0)
-        user = float(self.total_average_comparison.get('user', 0) or 0)
-        max_val = max(avg, user, 1)
-        return int((user / max_val) * 130)
-
-    def toggle_analysis_detail(self):
-        """분석 결과 카드 펼치기/접기"""
-        self.show_analysis_detail = not self.show_analysis_detail
-
-    def toggle_suggestions_detail(self):
-        """탄소 저감 제안 카드 펼치기/접기"""
-        self.show_suggestions_detail = not self.show_suggestions_detail
+    def reset_water_selection(self):
+        """다시 선택하기: 모든 선택 초기화하고 카테고리 선택 단계로 돌아가기"""
+        self.water_input_mode = False
+        self.selected_shower = False
+        self.selected_dish = False
+        self.selected_laundry = False
+        self.show_shower = False
+        self.show_dish = False
+        self.show_laundry = False
+    
+    async def handle_water_submit(self, form_data: dict):
+        """물 입력값 폼 제출 -> 데이터 저장 -> 리포트로 이동"""
+        print(f"[물 제출] handle_water_submit 호출됨, form_data: {form_data}")
+        
+        # 기존 물 데이터 제거
+        self.all_activities = [
+            act for act in self.all_activities 
+            if act.get("category") != "물"
+        ]
+        
+        water_data = []
+        
+        if self.show_shower and form_data.get("shower_value"):
+            water_data.append({
+                "category": "물",
+                "activity_type": "샤워",
+                "value": float(form_data.get("shower_value", 0)),
+                "unit": form_data.get("shower_unit", "회"),
+            })
+        
+        if self.show_dish and form_data.get("dish_count"):
+            water_data.append({
+                "category": "물",
+                "activity_type": "설거지",
+                "value": float(form_data.get("dish_count", 0)),
+                "unit": "회",
+            })
+        
+        if self.show_laundry and form_data.get("laundry_count"):
+            water_data.append({
+                "category": "물",
+                "activity_type": "세탁",
+                "value": float(form_data.get("laundry_count", 0)),
+                "unit": "회",
+            })
+        
+        self.all_activities = self.all_activities + water_data
+        import sys
+        sys.stderr.write(f"[물 제출] water_data 추가 완료, 총 all_activities 개수: {len(self.all_activities)}\n")
+        sys.stderr.write(f"[물 제출] water_data: {water_data}\n")
+        sys.stderr.write(f"[물 제출] 현재 all_activities: {self.all_activities}\n")
+        sys.stderr.flush()
+        
+        # 입력모드 종료 + 선택 초기화
+        self.water_input_mode = False
+        self.selected_shower = False
+        self.selected_dish = False
+        self.selected_laundry = False
+        self.show_shower = False
+        self.show_dish = False
+        self.show_laundry = False
+        
+        # 리포트 계산 플래그 초기화 (리포트 페이지에서 다시 계산하도록)
+        self.is_report_calculated = False
+        print(f"[물 제출] 쓰레기 페이지로 리다이렉트 시도...")
+        
+        # 쓰레기 페이지로 이동
+        yield rx.redirect("/input/waste")
     
     # ------------------------------ 리포트 계산 메서드 ------------------------------
     
     async def calculate_report(self):
         """리포트 페이지에서 전체 탄소 배출량을 계산합니다."""
-
-        print(f"=" * 50)
-        print(f"[리포트 계산] 시작!")
+        logger.info("[리포트 계산] 시작 - 전체 활동 데이터 계산 중...")
         print(f"[리포트 계산] all_activities 개수: {len(self.all_activities)}")
         print(f"[리포트 계산] all_activities 내용: {self.all_activities}")
-        print(f"=" * 50)
-
-        logger.info("[리포트 계산] 시작 - 전체 활동 데이터 계산 중...")
         
         try:
             from ..service.carbon_calculator import calculate_carbon_emission
@@ -933,6 +1082,14 @@ class CarbonState(AuthState):
             calculation_details = []  # 상세 계산 내역 저장
             
             logger.info(f"[리포트 계산] 총 {len(self.all_activities)}개의 활동 데이터 처리 시작")
+            
+            # 활동 데이터가 없으면 계산하지 않음
+            if len(self.all_activities) == 0:
+                logger.warning("[리포트 계산] 활동 데이터가 없습니다. 계산을 건너뜁니다.")
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+                self.calculation_details = []
+                return
             
             for idx, activity in enumerate(self.all_activities):
                 category = activity.get("category", "")
@@ -990,10 +1147,52 @@ class CarbonState(AuthState):
             # 카테고리별 배출량 집계
             await self._calculate_category_breakdown()
             
+            # 레벨 계산
+            self._calculate_carbon_level()
+            
         except Exception as e:
             logger.error(f"[리포트 계산] ❌ 계산 오류 발생: {e}", exc_info=True)
             self.total_carbon_emission = 0.0
             self.is_report_calculated = False
+    
+    def _calculate_carbon_level(self):
+        """탄소 배출량 기준으로 레벨 계산 (배출량이 낮을수록 높은 레벨)"""
+        emission = self.total_carbon_emission
+        
+        # 레벨 기준 (배출량이 낮을수록 높은 레벨)
+        # Level 5: 0-2 kg (매우 낮음, 최고 등급)
+        # Level 4: 2-5 kg (낮음)
+        # Level 3: 5-10 kg (보통)
+        # Level 2: 10-20 kg (높음)
+        # Level 1: 20+ kg (매우 높음, 최하 등급)
+        
+        if emission <= 2.0:
+            self.carbon_level = 5
+            self.carbon_level_image = "/level_5.png"
+            self.next_level_threshold = 0.0  # 이미 최고 레벨
+            self.next_level_text = "최고 레벨을 달성하셨습니다! 🏆"
+        elif emission <= 5.0:
+            self.carbon_level = 4
+            self.carbon_level_image = "/level_4.png"
+            self.next_level_threshold = emission - 2.0  # 2kg까지 감소 필요
+            self.next_level_text = f"Level 5까지 {self.next_level_threshold:.2f}kg 더 줄여보세요!"
+        elif emission <= 10.0:
+            self.carbon_level = 3
+            self.carbon_level_image = "/level_3.png"
+            self.next_level_threshold = emission - 5.0  # 5kg까지 감소 필요
+            self.next_level_text = f"Level 4까지 {self.next_level_threshold:.2f}kg 더 줄여보세요!"
+        elif emission <= 20.0:
+            self.carbon_level = 2
+            self.carbon_level_image = "/level_2.png"
+            self.next_level_threshold = emission - 10.0  # 10kg까지 감소 필요
+            self.next_level_text = f"Level 3까지 {self.next_level_threshold:.2f}kg 더 줄여보세요!"
+        else:
+            self.carbon_level = 1
+            self.carbon_level_image = "/level_1.png"
+            self.next_level_threshold = emission - 20.0  # 20kg까지 감소 필요
+            self.next_level_text = f"Level 2까지 {self.next_level_threshold:.2f}kg 더 줄여보세요!"
+        
+        logger.info(f"[레벨 계산] 배출량: {emission}kg → 레벨: {self.carbon_level}, 다음 레벨까지: {self.next_level_threshold:.2f}kg 감소 필요")
     
     # ------------------------------ DB 저장 메서드 ------------------------------
     
@@ -1187,30 +1386,17 @@ class CarbonState(AuthState):
                     logger.info("[저장] 새 로그 생성")
                 
                 session.add(log)
-
+                
                 # 사용자 포인트 업데이트 (같은 세션에서)
                 if is_new_log:
                     # 새로운 로그: 포인트 추가
                     user.current_points += points_earned
                     logger.info(f"[저장] 새 로그 - 포인트 추가: {user.current_points - points_earned} + {points_earned} = {user.current_points}")
-
-                    # 포인트 로그 기록 (새 로그인 경우에만)
-                    if points_earned > 0:
-                        from ..models import PointsLog
-
-                        points_log = PointsLog(
-                            student_id=self.current_user_id,
-                            log_date=today,
-                            points=points_earned,
-                            source="리포트",
-                            description="활동 기록"
-                        )
-                        session.add(points_log)
                 else:
                     # 기존 로그 업데이트: 기존 포인트를 빼고 새 포인트 추가
                     user.current_points = user.current_points - old_points + points_earned
                     logger.info(f"[저장] 기존 로그 업데이트 - 포인트 조정: {user.current_points + old_points - points_earned} - {old_points} + {points_earned} = {user.current_points}")
-
+                
                 self.current_user_points = user.current_points
                 session.add(user)
                 
@@ -1230,7 +1416,7 @@ class CarbonState(AuthState):
                     # 빈티지 제품 사용 확인
                     vintage_count = sum(int(act.get("value", 0)) for act in self.all_activities 
                                       if act.get("category") == "의류" 
-                                      and act.get("sub_category") == "빈티지")
+                                      and (act.get("sub_category") == "빈티지" or act.get("subcategory") == "빈티지" or act.get("sub") == "빈티지"))
                     if vintage_count > 0:
                         reasons.append(f"빈티지 제품 {vintage_count}개")
                     # 평균보다 낮은 배출량 확인
@@ -1353,7 +1539,7 @@ class CarbonState(AuthState):
             logger.error(f"로그 이력 조회 오류: {e}", exc_info=True)
             return []
     
-    def get_carbon_statistics(self) -> Dict[str, Any]:
+    async def get_carbon_statistics(self) -> Dict[str, Any]:
         """탄소 배출량 통계 데이터 반환"""
         if not self.is_logged_in or not self.current_user_id:
             return {
@@ -1448,12 +1634,19 @@ class CarbonState(AuthState):
     average_comparison: Dict[str, Dict[str, float]] = {}
     average_comparison_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태 (사용 안 함)
     total_average_comparison: Dict[str, Any] = {}  # 총 평균 비교만 사용
+    has_average_comparison: bool = False  # 평균 비교 데이터 존재 여부
     category_emission_list: List[Dict[str, Any]] = []  # foreach에서 사용하기 위한 리스트 형태
     donut_chart_svg: str = ""  # 도넛 차트 SVG 문자열
     ai_analysis_result: str = ""
     ai_suggestions: List[str] = []
     ai_alternatives: List[Dict[str, Any]] = []
     is_loading_ai: bool = False
+    
+    # 레벨 시스템 관련 상태
+    carbon_level: int = 1  # 현재 레벨 (1-5)
+    next_level_threshold: float = 0.0  # 다음 레벨까지 필요한 탄소 배출량 감소량
+    carbon_level_image: str = "/level_1.png"  # 레벨 배지 이미지 경로
+    next_level_text: str = ""  # 다음 레벨 달성을 위한 안내 텍스트
     
     async def _calculate_savings(self):
         """자전거/걷기 사용 시 절약한 탄소 배출량 계산"""
@@ -1552,7 +1745,7 @@ class CarbonState(AuthState):
             vintage_count = 0
             for activity in self.all_activities:
                 category = activity.get("category")
-                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("sub")
                 if category == "의류" and sub_category == "빈티지":
                     vintage_count += int(activity.get("value", 0))
             
@@ -1604,7 +1797,7 @@ class CarbonState(AuthState):
             logger.info(f"[포인트 계산] all_activities 개수: {len(self.all_activities)}")
             for activity in self.all_activities:
                 category = activity.get("category")
-                sub_category = activity.get("sub_category") or activity.get("subcategory")
+                sub_category = activity.get("sub_category") or activity.get("subcategory") or activity.get("sub")
                 value = activity.get("value", 0)
                 logger.info(f"[포인트 계산] 활동 확인: category={category}, sub_category={sub_category}, value={value}")
                 if category == "의류" and sub_category == "빈티지":
@@ -1671,6 +1864,7 @@ class CarbonState(AuthState):
                 "abs_difference_str": f"차이: {abs_difference:.2f} kgCO₂e",
                 "percentage_str": f"({percentage:.1f}%)",
             }
+            self.has_average_comparison = True
             
             # 카테고리별 평균 비교는 제거
             self.average_comparison = {}
@@ -1691,8 +1885,20 @@ class CarbonState(AuthState):
                 "쓰레기": "#ef4444"
             }
             
+            # 카테고리별 평균값 가져오기
+            from ..service.average_data import get_average_emission
+            
             for category, emission in category_emission.items():
                 percentage = (emission / total) * 100 if total > 0 else 0
+                
+                # 카테고리별 평균값과 비교
+                avg_emission = get_average_emission(category)
+                difference = emission - avg_emission
+                diff_percentage = (difference / avg_emission * 100) if avg_emission > 0 else 0
+                is_better = difference < 0
+                
+                # 포인트 계산 (평균 대비 포인트는 전체 포인트 계산에서 사용)
+                # 여기서는 표시용으로만 저장
                 category_list.append({
                     "category": category,
                     "emission": round(emission, 2),
@@ -1702,7 +1908,14 @@ class CarbonState(AuthState):
                     "cumulative_percentage": cumulative_percentage,
                     "stroke_dasharray": f"{2 * 3.14159 * 80 * (percentage / 100)} {2 * 3.14159 * 80}",
                     "stroke_dashoffset": cumulative_percentage * 2 * 3.14159 * 80 / 100,
-                    "rotation": -90 + cumulative_percentage * 360 / 100
+                    "rotation": -90 + cumulative_percentage * 360 / 100,
+                    # 평균 비교 데이터
+                    "average_emission": round(avg_emission, 2),
+                    "difference": round(difference, 2),
+                    "diff_percentage": round(diff_percentage, 1),
+                    "is_better": is_better,
+                    "diff_str": f"{abs(difference):.2f} kgCO₂e {'절감' if is_better else '초과'}",
+                    "diff_percentage_str": f"{abs(diff_percentage):.1f}% {'낮음' if is_better else '높음'}"
                 })
                 cumulative_percentage += percentage
             
@@ -1719,6 +1932,7 @@ class CarbonState(AuthState):
             self.average_comparison = {}
             self.average_comparison_list = []
             self.total_average_comparison = {}
+            self.has_average_comparison = False
             self.category_emission_list = []
             self.donut_chart_svg = ""
     
@@ -1731,40 +1945,27 @@ class CarbonState(AuthState):
             
             svg_parts = []
             svg_parts.append('<svg width="200" height="200" viewBox="0 0 200 200">')
-            
-            # 배경 원 (회색)
             svg_parts.append('<circle cx="100" cy="100" r="80" fill="none" stroke="#e5e7eb" stroke-width="20"/>')
             
-            circumference = 2 * 3.14159 * 80  # 원의 둘레
-            cumulative_offset = 0  # 누적 오프셋
-            
+            cumulative_percentage = 0
             for item in self.category_emission_list:
                 percentage = item["percentage"]
                 if percentage > 0:
-                    # 이 세그먼트의 길이
+                    circumference = 2 * 3.14159 * 80
                     dash_length = circumference * (percentage / 100)
-                    
-                    # stroke-dashoffset: 시작점을 얼마나 이동할지
-                    # 음수로 설정하면 시계 방향으로 이동
-                    offset = -cumulative_offset
+                    dash_offset = circumference * (cumulative_percentage / 100)
+                    rotation = -90 + (cumulative_percentage * 360 / 100)
                     
                     svg_parts.append(
                         f'<circle cx="100" cy="100" r="80" fill="none" stroke="{item["color"]}" '
-                        f'stroke-width="20" '
-                        f'stroke-dasharray="{dash_length} {circumference}" '
-                        f'stroke-dashoffset="{offset}" '
-                        f'transform="rotate(-90 100 100)"/>'
+                        f'stroke-width="20" stroke-dasharray="{dash_length} {circumference}" '
+                        f'stroke-dashoffset="{dash_offset}" transform="rotate({rotation} 100 100)"/>'
                     )
-                    
-                    # 다음 세그먼트를 위해 누적
-                    cumulative_offset += dash_length
-            
-            # 중앙 흰색 원 (도넛 구멍)
-            svg_parts.append('<circle cx="100" cy="100" r="60" fill="white"/>')
+                    cumulative_percentage += percentage
             
             # 중앙 텍스트
-            svg_parts.append('<text x="100" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#374151">총 배출량</text>')
-            svg_parts.append(f'<text x="100" y="115" text-anchor="middle" font-size="16" font-weight="bold" fill="#1e40af">{self.total_carbon_emission:.2f}kg</text>')
+            svg_parts.append('<text x="100" y="95" text-anchor="middle" font-size="14" font-weight="bold" fill="#374151">총 배출량</text>')
+            svg_parts.append(f'<text x="100" y="115" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e40af">{self.total_carbon_emission:.2f}kg</text>')
             svg_parts.append('</svg>')
             
             self.donut_chart_svg = ''.join(svg_parts)
@@ -1785,43 +1986,161 @@ class CarbonState(AuthState):
         self.ai_alternatives = []
         
         try:
-            from ..service.ai_coach import generate_coaching_message
-            from ..service.models import AICoachRequest
+            # 정책 후보 기본 세트 주입 (빈 경우에만)
+            if not self.policy_candidates:
+                self.policy_candidates = [
+                    {
+                        "name": "광역알뜰교통카드",
+                        "reason": "교통비를 절감하면서 대중교통 이용을 늘릴 때 적합합니다.",
+                        "url": "https://www.alcard.kr",
+                    },
+                    {
+                        "name": "탄소중립포인트",
+                        "reason": "전기·가스·수도 절약 시 포인트 적립을 받을 수 있습니다.",
+                        "url": "https://cpoint.or.kr",
+                    },
+                    {
+                        "name": "다회용컵 보증금 제도",
+                        "reason": "카페 일회용컵 사용을 줄이면 보증금을 환급받을 수 있습니다.",
+                        "url": "https://www.zeroshop.kr",
+                    },
+                ]
+            from ..ai.llm_service import get_coaching_feedback
+            import json
             
-            # AI 코칭 요청 생성
-            request = AICoachRequest(
-                total_carbon=self.total_carbon_emission,
-                category_breakdown=self.category_emission_breakdown,
-                activities=self.all_activities
+            # 총배출량 정합성 검증: 카테고리 합계와 total_carbon_emission 일치 보정
+            breakdown = self.category_emission_breakdown or {}
+            try:
+                breakdown_sum = float(sum(float(v) for v in breakdown.values())) if breakdown else 0.0
+            except Exception:
+                breakdown_sum = float(self.total_carbon_emission or 0.0)
+            
+            total_carbon = float(self.total_carbon_emission or 0.0)
+            # 합계와 차이가 크면 합계 기준으로 보정
+            if abs(breakdown_sum - total_carbon) > 1e-6:
+                logger.info(
+                    "AI 요청용 총배출량 보정: breakdown_sum=%.4f, total=%.4f",
+                    breakdown_sum,
+                    total_carbon,
+                )
+                total_carbon = breakdown_sum
+            
+            payload = {
+                "category_carbon_data": self.category_emission_breakdown or {},
+                "total_carbon_kg": total_carbon,
+                "category_activity_data": self.category_emission_breakdown or {},
+                "policy_candidates": getattr(self, "policy_candidates", []),
+            }
+            
+            feedback_json = get_coaching_feedback(payload)
+            parsed = json.loads(feedback_json)
+            
+            # 분석 요약
+            final_screen = parsed.get("final_report_screen", {}) if isinstance(parsed, dict) else {}
+            today_screen = parsed.get("today_result_screen", {}) if isinstance(parsed, dict) else {}
+            
+            self.ai_analysis_result = (
+                final_screen.get("total_summary_text")
+                or today_screen.get("usage_summary_text")
+                or "AI 분석 결과를 불러올 수 없습니다."
             )
             
-            # AI 분석 결과 생성
-            response = generate_coaching_message(request)
+            # 행동 제안
+            recos = final_screen.get("recommendations", []) if isinstance(final_screen, dict) else []
+            suggestions = []
+            for r in recos:
+                if isinstance(r, dict):
+                    action = r.get("action")
+                    detail = r.get("detail")
+                    if action and detail:
+                        suggestions.append(f"{action}: {detail}")
+                    elif action:
+                        suggestions.append(action)
+            self.ai_suggestions = suggestions[:5] if suggestions else []
             
-            self.ai_analysis_result = response.analysis
-            self.ai_suggestions = response.suggestions
-            self.ai_alternatives = response.alternative_actions 
+            # 정책/대안(폴백)
+            policy_recos = final_screen.get("policy_recommendations", []) if isinstance(final_screen, dict) else []
+            alternatives = []
+            for p in policy_recos:
+                if isinstance(p, dict):
+                    name = p.get("name") or p.get("title") or ""
+                    desc = p.get("description") or p.get("detail") or p.get("reason") or ""
+                    url = p.get("url") or ""
+                    if name or desc or url:
+                        alternatives.append({
+                            "current": name,
+                            "alternative": desc,
+                            "impact": url,
+                        })
+            # 정책 추천이 비어있으면 기본 정책 후보 사용
+            if not alternatives and hasattr(self, "policy_candidates") and self.policy_candidates:
+                for policy in self.policy_candidates:
+                    alternatives.append({
+                        "current": policy.get("name", ""),
+                        "alternative": policy.get("reason", ""),
+                        "impact": policy.get("url", ""),
+                    })
             
-            logger.info(f"AI 분석 결과 생성 완료")
+            self.ai_alternatives = alternatives
+            
+            logger.info(f"AI 분석 결과 생성 완료 - 분석: {len(self.ai_analysis_result)}자, 제안: {len(self.ai_suggestions)}개, 정책: {len(self.ai_alternatives)}개")
             
         except Exception as e:
             logger.error(f"AI 분석 결과 생성 오류: {e}", exc_info=True)
             self.ai_analysis_result = "AI 분석을 불러오는 중 오류가 발생했습니다."
             self.ai_suggestions = []
-            self.ai_alternatives = []
+            # 오류 발생 시에도 기본 정책 후보 표시
+            if hasattr(self, "policy_candidates") and self.policy_candidates:
+                self.ai_alternatives = [
+                    {
+                        "current": policy.get("name", ""),
+                        "alternative": policy.get("reason", ""),
+                        "impact": policy.get("url", ""),
+                    }
+                    for policy in self.policy_candidates
+                ]
+            else:
+                self.ai_alternatives = []
         finally:
             self.is_loading_ai = False
-    
+
     async def on_report_page_load(self):
-        """리포트 페이지 로드 시 자동으로 계산 및 AI 분석 실행"""
-        print("[리포트 페이지] 자동 계산 시작...")
+        """리포트 페이지 로드 시 자동으로 계산 및 AI 분석 실행 (하루에 여러 번 가능)"""
+        import sys
+        print("[리포트 페이지] 자동 계산 시작...", file=sys.stderr, flush=True)
+        print(f"[리포트 페이지] all_activities 개수: {len(self.all_activities)}", file=sys.stderr, flush=True)
+        print(f"[리포트 페이지] all_activities 내용: {self.all_activities}", file=sys.stderr, flush=True)
         
-        # 1. 리포트 계산이 안 되어 있으면 계산
-        if not self.is_report_calculated:
-            await self.calculate_report()
-        
-        # 2. AI 분석이 안 되어 있으면 자동 시작
-        if self.is_report_calculated and self.ai_analysis_result == "":
-            await self.generate_ai_analysis()
-        
-        print("[리포트 페이지] 자동 계산 및 AI 분석 완료")
+        try:
+            # 리포트는 항상 새로 계산 (하루에 여러 번 생성 가능)
+            print("[리포트 페이지] 리포트 계산 시작...")
+            if len(self.all_activities) == 0:
+                print("[리포트 페이지] ⚠️ 경고: all_activities가 비어있습니다!")
+                # 빈 리포트라도 계산 완료로 표시
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+                self.calculation_details = []
+                self.ai_analysis_result = ""  # AI 분석도 초기화
+            else:
+                # 리포트 재계산 (항상 새로 계산)
+                self.is_report_calculated = False
+                self.ai_analysis_result = ""  # AI 분석도 초기화하여 재생성
+                await self.calculate_report()
+                print(f"[리포트 페이지] 리포트 계산 완료. is_report_calculated: {self.is_report_calculated}")
+                print(f"[리포트 페이지] 총 배출량: {self.total_carbon_emission}kgCO2e")
+            
+            # AI 분석 실행 (항상 새로 생성)
+            if self.is_report_calculated:
+                print("[리포트 페이지] AI 분석 시작...")
+                await self.generate_ai_analysis()
+            
+            print("[리포트 페이지] 자동 계산 및 AI 분석 완료")
+        except Exception as e:
+            print(f"[리포트 페이지] ❌ 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            # 오류 발생 시에도 리포트 표시 가능하도록
+            if not self.is_report_calculated:
+                self.total_carbon_emission = 0.0
+                self.is_report_calculated = True
+

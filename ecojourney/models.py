@@ -10,12 +10,14 @@ class User(rx.Model, table=True):
     """
     사용자 정보를 저장하는 테이블
     - student_id: 로그인 ID이자 고유 식별자 (Primary Key)
+    - nickname: 사용자 닉네임 (표시용)
     - college: 대항전 매칭을 위한 소속 단과대
     - current_points: 베팅 및 마일리지 환산에 사용할 잔액
     """
     # Primary Key는 필드 이름이 id이거나 첫 번째 필드로 정의
     student_id: str  # Primary Key로 사용 (Reflex가 자동 처리)
     password: str
+    nickname: str  
     college: str
     current_points: int = 0
     created_at: datetime = datetime.now()

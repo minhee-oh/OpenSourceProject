@@ -1,130 +1,8 @@
 # ranking.py - 저번주 대결 랭킹 페이지
 
 import reflex as rx
-from ecojourney.state import AppState
-
-
-def header() -> rx.Component:
-    return rx.box(
-        rx.hstack(
-            # 로고 버튼
-            rx.button(
-                "ECOJOURNEY",
-                on_click=rx.redirect("/"),
-                background_color="transparent",
-                color="#FFFFFF",
-                font_size="1.5em",
-                font_weight="bold",
-                padding="0",
-                border="none",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-
-            # 로그인 상태에 따른 메뉴
-            rx.cond(
-                AppState.is_logged_in,
-                rx.hstack(
-                    rx.button(
-                        "챌린지",
-                        on_click=rx.redirect("/info"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "배틀",
-                        on_click=rx.redirect("/battle"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "랭킹",
-                        on_click=rx.redirect("/ranking"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="1px solid #FFFFFF",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                    ),
-                    rx.button(
-                        "리포트",
-                        on_click=rx.redirect("/intro"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.text(
-                        f"{AppState.current_user_id}님",
-                        color="#FFFFFF",
-                        font_size="1em",
-                        margin_right="10px",
-                    ),
-                    rx.button(
-                        "마이페이지",
-                        on_click=rx.redirect("/mypage"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "로그아웃",
-                        on_click=AppState.logout,
-                        background_color="#FFFFFF",
-                        color="#4DAB75",
-                        border="1px solid #4DAB75",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                    ),
-                    spacing="3",
-                    align="center",
-                ),
-
-                # 로그인 안 된 상태 → 로그인 버튼
-                rx.button(
-                    "로그인",
-                    on_click=rx.redirect("/auth"),
-                    background_color="#FFFFFF",
-                    color="#4DAB75",
-                    border="1px solid #4DAB75",
-                    border_radius="25px",
-                    padding="8px 20px",
-                    font_weight="500",
-                    _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                ),
-            ),
-
-            justify="between",
-            align="center",
-            padding="1.5em 3em",
-        ),
-
-        width="100%",
-        position="relative",
-        z_index="10",
-        background_color="#4DAB75",
-        border_bottom="1px solid rgba(255, 255, 255, 0.1)",
-    )
+from ..states import AppState
+from .common_header import header
 
 
 def ranking_page() -> rx.Component:
@@ -133,7 +11,8 @@ def ranking_page() -> rx.Component:
         AppState.is_logged_in,
         rx.box(
             header(),
-
+            # 헤더 공간 확보
+            rx.box(height="100px"),
         # fade-in 애니메이션을 위한 CSS 삽입
         rx.html("""
         <style>
@@ -263,23 +142,23 @@ def ranking_page() -> rx.Component:
                                                         rx.cond(
                                                             ranking["rank"] == 3,
                                                             rx.badge("🥉 3등", color_scheme="orange", size="2"),
-                                                            rx.text(ranking["rank"], size="3", color="white"),
+                                                            rx.text(ranking["rank"], size="5", color="white", font_weight="bold"),
                                                         ),
                                                     ),
                                                 ),
                                             ),
                                             rx.table.cell(
-                                                rx.text(ranking["student_id"], size="3", color="#333333"),
+                                                rx.text(ranking.get("nickname", ranking.get("student_id", "")), size="5", color="#333333", font_weight="bold"),
                                             ),
                                             rx.table.cell(
-                                                rx.text(ranking["college"], size="3", color="#333333"),
+                                                rx.text(ranking["college"], size="5", color="#333333", font_weight="bold"),
                                             ),
                                             rx.table.cell(
                                                 rx.text(
                                                     f"{ranking['points']:,}점",
-                                                    size="3",
+                                                    size="5",
                                                     color="#4DAB75",
-                                                    weight="bold",
+                                                    font_weight="bold",
                                                 ),
                                             ),
                                         ),
@@ -292,8 +171,9 @@ def ranking_page() -> rx.Component:
                         ),
                         rx.text(
                             "랭킹 데이터가 없습니다.",
-                            size="3",
+                            size="5",
                             color="gray.600",
+                            font_weight="bold",
                         ),
                     ),
                     spacing="4",
@@ -420,7 +300,7 @@ def ranking_page() -> rx.Component:
                 z_index="2",
                 display="flex",
                 justify_content="center",
-                margin_top="70vh",
+                margin_top="66vh",
             ),
         ),
         ),

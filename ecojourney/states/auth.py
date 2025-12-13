@@ -4,11 +4,14 @@
 
 import reflex as rx
 from typing import Optional
-from datetime import datetime
-import hashlib
+import sqlite3
 import logging
+import json
+import hashlib
+from pydantic import ValidationError
 from .base import BaseState
-from ..models import User
+from ..ai.services import auth_service
+from ..schemas.user import UserCreate
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,7 @@ class AuthState(BaseState):
     """
     # 사용자 인증 관련 상태
     current_user_id: Optional[str] = None
+    current_user_nickname: Optional[str] = None
     current_user_college: Optional[str] = None
     current_user_points: int = 0
     is_logged_in: bool = False
@@ -28,6 +32,7 @@ class AuthState(BaseState):
     login_password: str = ""
     signup_student_id: str = ""
     signup_password: str = ""
+    signup_nickname: str = ""
     signup_college: str = ""
     auth_error_message: str = ""
 
@@ -90,9 +95,11 @@ class AuthState(BaseState):
 
             # 세션 복원
             self.current_user_id = user.student_id
+            self.current_user_nickname = user.nickname
             self.current_user_college = user.college
             self.current_user_points = user.current_points
             self.is_logged_in = True
+            # 챌린지 상태는 페이지 로드 시 자동으로 로드됨 (/info 페이지 on_load에 load_quiz_state 추가됨)
 
         except Exception as e:
             logger.error(f"세션 복원 오류: {e}", exc_info=True)
@@ -114,6 +121,9 @@ class AuthState(BaseState):
     def set_signup_college(self, value: str):
         self.signup_college = value
     
+    def set_signup_nickname(self, value: str):
+        self.signup_nickname = value
+    
     def _hash_password(self, password: str) -> str:
         """비밀번호를 해시화합니다."""
         return hashlib.sha256(password.encode()).hexdigest()
@@ -122,63 +132,72 @@ class AuthState(BaseState):
         """회원가입 처리 (auth_service 사용 - FastAPI와 통합)"""
         self.auth_error_message = ""
 
-        if not self.signup_student_id or not self.signup_password or not self.signup_college:
+        if not self.signup_student_id or not self.signup_password or not self.signup_nickname or not self.signup_college:
             self.auth_error_message = "모든 필드를 입력해주세요."
             return
 
         try:
-            # auth_service를 사용하여 회원가입 (FastAPI와 동일한 로직 사용)
-            from ..ai.services.auth_service import create_user, get_user
-            from ..schemas.user import UserCreate
-            from pydantic import ValidationError
-            import sqlite3
-
-            # 먼저 중복 체크 (DB 조회)
-            existing_user = get_user(self.signup_student_id)
-            if existing_user:
-                self.auth_error_message = "이미 존재하는 학번입니다."
-                logger.warning(f"회원가입 실패 - 중복 학번: {self.signup_student_id}")
-                return
-
-            # UserCreate 스키마로 변환 (Pydantic 검증)
+            # 백엔드 Auth 서비스(bcrypt) 사용
             try:
-                user_data = UserCreate(
-                    student_id=self.signup_student_id,
+                user_payload = UserCreate(
+                    student_id=self.signup_student_id.strip(),
                     password=self.signup_password,
-                    college=self.signup_college
+                    nickname=self.signup_nickname.strip(),
+                    college=self.signup_college.strip(),
                 )
             except ValidationError as ve:
-                # Pydantic 검증 오류를 사용자 친화적인 메시지로 변환
-                for error in ve.errors():
-                    if error['loc'] == ('password',) and 'string_too_short' in str(error['type']):
-                        self.auth_error_message = "비밀번호는 최소 6자 이상이어야 합니다."
-                        return
-                # 기타 검증 오류
-                self.auth_error_message = "입력 정보가 올바르지 않습니다."
-                logger.warning(f"회원가입 실패 - 검증 오류: {ve}")
+                # 비밀번호 길이, 닉네임 길이 등 입력 검증 메시지 노출
+                error_details = str(ve)
+                if "password" in error_details.lower():
+                    self.auth_error_message = "비밀번호는 최소 6자 이상 입력해주세요."
+                elif "nickname" in error_details.lower():
+                    self.auth_error_message = "닉네임은 2-20자 사이로 입력해주세요."
+                else:
+                    self.auth_error_message = "입력값을 확인해주세요."
+                logger.warning(f"회원가입 검증 오류: {ve}")
                 return
-
-            # 사용자 생성 (auth_service 사용)
             try:
-                create_user(user_data)
-            except sqlite3.IntegrityError:
-                self.auth_error_message = "이미 존재하는 학번입니다."
-                logger.warning(f"회원가입 실패 - IntegrityError: {self.signup_student_id}")
+                auth_service.create_user(user_payload)
+            except sqlite3.IntegrityError as e:
+                error_msg = str(e)
+                if "닉네임" in error_msg:
+                    self.auth_error_message = "이미 사용 중인 닉네임입니다."
+                else:
+                    self.auth_error_message = "이미 존재하는 학번입니다."
                 return
-            except Exception as create_error:
-                logger.error(f"사용자 생성 오류: {create_error}", exc_info=True)
-                self.auth_error_message = f"회원가입 실패: {str(create_error)}"
+            
+            # 가입 후 사용자 정보 조회
+            user_info = auth_service.get_user(user_payload.student_id)
+            if not user_info:
+                self.auth_error_message = "회원정보를 불러오지 못했습니다."
                 return
-
+            
             # 로그인 상태로 전환
-            self.current_user_id = self.signup_student_id
-            self.current_user_college = self.signup_college
-            self.current_user_points = 0
+            self.current_user_id = user_info.student_id
+            self.current_user_nickname = user_info.nickname
+            self.current_user_college = user_info.college
+            self.current_user_points = user_info.current_points
             self.is_logged_in = True
-
+            
+            # 로컬 스토리지 저장 시도 (EventSpec는 await 불가하므로 호출만 수행)
+            if hasattr(rx, "set_local_storage"):
+                try:
+                    rx.set_local_storage(
+                        "auth_user",
+                        {
+                            "student_id": self.current_user_id,
+                            "nickname": self.current_user_nickname,
+                            "college": self.current_user_college,
+                            "current_points": self.current_user_points,
+                        },
+                    )
+                except Exception as e:
+                    logger.debug(f"로컬 스토리지 저장 실패(무시): {e}")
+            
             # 폼 초기화
             self.signup_student_id = ""
             self.signup_password = ""
+            self.signup_nickname = ""
             self.signup_college = ""
 
             logger.info(f"회원가입 성공: {self.current_user_id}")
@@ -201,29 +220,43 @@ class AuthState(BaseState):
             return
 
         try:
-            # auth_service를 사용하여 로그인 검증 (FastAPI와 동일한 로직)
-            from ..ai.services.auth_service import verify_user, get_user
-
-            # 비밀번호 검증
-            is_valid = verify_user(self.login_student_id, self.login_password)
-            if not is_valid:
+            # 입력값 정규화
+            login_id = self.login_student_id.strip()
+            login_pw = self.login_password
+            
+            # 백엔드 검증 (해시 포함)
+            ok = auth_service.verify_user(login_id, login_pw)
+            if not ok:
                 self.auth_error_message = "학번 또는 비밀번호가 올바르지 않습니다."
-                logger.warning(f"로그인 실패 - 잘못된 인증 정보: {self.login_student_id}")
                 return
 
-            # 사용자 정보 조회
-            user = get_user(self.login_student_id)
-            if not user:
-                self.auth_error_message = "존재하지 않는 사용자입니다."
-                logger.error(f"로그인 실패 - 사용자 없음: {self.login_student_id}")
+            user_info = auth_service.get_user(login_id)
+            if not user_info:
+                self.auth_error_message = "존재하지 않는 학번입니다."
                 return
-
+            
             # 로그인 성공
-            self.current_user_id = user.student_id
-            self.current_user_college = user.college
-            self.current_user_points = user.current_points
+            self.current_user_id = user_info.student_id
+            self.current_user_nickname = user_info.nickname
+            self.current_user_college = user_info.college
+            self.current_user_points = user_info.current_points
             self.is_logged_in = True
-
+            
+            # 로컬 스토리지 저장 시도 (EventSpec는 await 불가하므로 호출만 수행)
+            if hasattr(rx, "set_local_storage"):
+                try:
+                    rx.set_local_storage(
+                        "auth_user",
+                        {
+                            "student_id": self.current_user_id,
+                            "nickname": self.current_user_nickname,
+                            "college": self.current_user_college,
+                            "current_points": self.current_user_points,
+                        },
+                    )
+                except Exception as e:
+                    logger.debug(f"로컬 스토리지 저장 실패(무시): {e}")
+            
             # 폼 초기화
             self.login_student_id = ""
             self.login_password = ""
@@ -232,6 +265,7 @@ class AuthState(BaseState):
 
             # 세션 저장
             yield from self._save_session_to_storage()
+            # 챌린지 상태는 페이지 로드 시 자동으로 로드됨 (/info 페이지 on_load에 load_quiz_state 추가됨)
 
             return rx.redirect("/")
 
@@ -241,18 +275,31 @@ class AuthState(BaseState):
     
     def logout(self):
         """로그아웃 처리"""
-        logger.info(f"[로그아웃] 사용자: {self.current_user_id}")
-
+        if hasattr(rx, "remove_local_storage"):
+            try:
+                rx.remove_local_storage("auth_user")
+            except Exception as e:
+                logger.debug(f"로컬 스토리지 제거 실패(무시): {e}")
         self.current_user_id = None
+        self.current_user_nickname = None
         self.current_user_college = None
         self.current_user_points = 0
         self.is_logged_in = False
         self.all_activities = []
+        # 챌린지 상태는 로그아웃 후 페이지 이동 시 자동으로 초기화됨
 
         # 세션 스토리지 삭제
         yield from self._clear_session_storage()
 
         return rx.redirect("/")
+
+    async def hydrate_auth(self):
+        """클라이언트 로컬 스토리지에서 로그인 정보 복원"""
+        try:
+            # 현재 Reflex 0.8.x에서는 get_local_storage EventSpec await 불가 → 복원 생략
+            return
+        except Exception as e:
+            logger.warning(f"로그인 정보 복원 실패: {e}")
 
 
 

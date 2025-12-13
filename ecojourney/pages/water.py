@@ -1,133 +1,9 @@
 # water.py - 물 입력 페이지
 
 import reflex as rx
-from ..state import AppState
-
-UNITS = ["분", "회"]
-
-def header() -> rx.Component:
-    return rx.box(
-        rx.hstack(
-            # 로고 버튼
-            rx.button(
-                "ECOJOURNEY",
-                on_click=rx.redirect("/"),
-                background_color="transparent",
-                color="#FFFFFF",
-                font_size="1.5em",
-                font_weight="bold",
-                padding="0",
-                border="none",
-                border_radius="8px",
-                cursor="pointer",
-            ),
-
-            # 로그인 상태에 따른 메뉴
-            rx.cond(
-                AppState.is_logged_in,
-                rx.hstack(
-                    rx.button(
-                        "챌린지",
-                        on_click=rx.redirect("/info"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "배틀",
-                        on_click=rx.redirect("/battle"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "랭킹",
-                        on_click=rx.redirect("/ranking"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"border": "1px solid #FFFFFF"},
-                    ),
-                    rx.button(
-                        "리포트",
-                        on_click=rx.redirect("/intro"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="1px solid #FFFFFF",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                    ),
-                    rx.text(
-                        f"{AppState.current_user_id}님",
-                        color="#FFFFFF",
-                        font_size="1em",
-                        margin_right="10px",
-                    ),
-                    rx.button(
-                        "마이페이지",
-                        on_click=rx.redirect("/mypage"),
-                        background_color="transparent",
-                        color="#FFFFFF",
-                        border="none",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={
-                            "border": "1px solid #FFFFFF",
-                        },
-                    ),
-                    rx.button(
-                        "로그아웃",
-                        on_click=AppState.logout,
-                        background_color="#FFFFFF",
-                        color="#4DAB75",
-                        border="1px solid #4DAB75",
-                        border_radius="25px",
-                        padding="8px 20px",
-                        font_weight="500",
-                        _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                    ),
-                    spacing="3",
-                    align="center",
-                ),
-
-                # 로그인 안 된 상태 → 로그인 버튼
-                rx.button(
-                    "로그인",
-                    on_click=rx.redirect("/auth"),
-                    background_color="#FFFFFF",
-                    color="#4DAB75",
-                    border="1px solid #4DAB75",
-                    border_radius="25px",
-                    padding="8px 20px",
-                    font_weight="500",
-                    _hover={"background_color": "rgba(255, 255, 255, 0.9)"},
-                ),
-            ),
-
-            justify="between",
-            align="center",
-            padding="1.5em 3em",
-        ),
-
-        width="100%",
-        position="relative",
-        z_index="10",
-        background_color="#4DAB75",
-        border_bottom="1px solid rgba(255, 255, 255, 0.1)",
-    )
+from ..states import AppState
+from .help_modal import help_icon_button, help_modal
+from .common_header import header
 
 # 공통 버튼 UI
 def water_button(label: str, is_selected, on_click):
@@ -156,15 +32,23 @@ def water_button(label: str, is_selected, on_click):
         font_size="1em",
         font_weight="600",
         cursor=cursor_style,
-        transition="all 0.25s ease",
-        box_shadow=rx.cond(is_selected, "0 4px 20px rgba(77, 171, 117, 0.3)", "none"),
+        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        box_shadow=rx.cond(is_selected, "0 4px 20px rgba(77, 171, 117, 0.4)", "0 2px 8px rgba(0, 0, 0, 0.1)"),
+        class_name="category-button",
         _hover=rx.cond(
             disabled,
             {},
             {
-                "transform": "translateY(-2px)",
-                "background_color": rx.cond(is_selected, "#4DAB75", "rgba(77, 171, 117, 0.2)"),
-                "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.4)",
+                "transform": "translateY(-3px) scale(1.02)",
+                "background_color": rx.cond(is_selected, "#3d9a66", "rgba(77, 171, 117, 0.25)"),
+                "box_shadow": "0 8px 30px rgba(77, 171, 117, 0.5)",
+            }
+        ),
+        _active=rx.cond(
+            disabled,
+            {},
+            {
+                "transform": "translateY(0) scale(0.98)",
             }
         ),
     )
@@ -176,8 +60,8 @@ def shower_input_field():
         rx.hstack(
             rx.text(
                 "샤워",
-                font_weight="600",
-                min_width="90px",
+                font_weight="bold",
+                min_width="80px",
                 color="#333333",
                 font_size="1em",
             ),
@@ -224,7 +108,7 @@ def shower_input_field():
         border="1px solid #E0E0E0",
         margin_y="12px",
         width="100%",
-        max_width="450px",
+        max_width="500px",
     )
 
 def water_input_field(label: str, value_name: str):
@@ -232,8 +116,8 @@ def water_input_field(label: str, value_name: str):
         rx.hstack(
             rx.text(
                 label,
-                font_weight="600",
-                min_width="90px",
+                font_weight="bold",
+                min_width="80px",
                 color="#333333",
                 font_size="1em",
             ),
@@ -266,7 +150,7 @@ def water_input_field(label: str, value_name: str):
         border="1px solid #E0E0E0",
         margin_y="12px",
         width="100%",
-        max_width="400px",
+        max_width="450px",
     )
 
 
@@ -276,25 +160,106 @@ def water_page():
         AppState.is_logged_in,
         rx.box(
             header(),
-            rx.container(
-            rx.vstack(
-                rx.heading(
-                    "물",
-                    size="9",
-                    color="#333333",
-                    font_weight="700",
-                    letter_spacing="-0.02em",
+            # 헤더 공간 확보
+            rx.box(height="100px"),
+            # fade-in 애니메이션을 위한 CSS 삽입
+            rx.html("""
+            <style>
+            @keyframes fadeInUp {
+                0% {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            @keyframes pulse {
+                0%, 100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.05);
+                }
+            }
+            @keyframes bounce {
+                0%, 100% {
+                    transform: translateY(0);
+                }
+                50% {
+                    transform: translateY(-5px);
+                }
+            }
+            .category-button {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .category-button:hover:not(:disabled) {
+                animation: pulse 0.6s ease-in-out;
+            }
+            .category-button:active:not(:disabled) {
+                animation: bounce 0.3s ease-in-out;
+            }
+            </style>
+            """),
+            # 배경 레이어 구성
+            rx.box(
+                # 상단 배경 레이어 + 제목과 설명 (고정)
+                rx.box(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.heading(
+                                "물 사용💧",
+                                size="7",
+                                color="#333333",
+                                margin_bottom="18px",
+                                style={
+                                    "opacity": 0,
+                                    "transform": "translateY(20px)",
+                                    "animation": "fadeInUp 0.8s ease forwards",
+                                    "animation-delay": "0.1s",
+                                    "pointer_events": "none",
+                                },
+                            ),
+                            rx.box(
+                                help_icon_button("물"),
+                                style={"pointer_events": "auto"},
+                            ),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.text(
+                            "오늘 사용한 물 관련 활동을 모두 선택해주세요",
+                            color="#333333",
+                            size="5",
+                            font_weight="normal",
+                            text_align="center",
+                            width="100%",
+                            style={
+                                "opacity": 0,
+                                "transform": "translateY(20px)",
+                                "animation": "fadeInUp 1s ease forwards",
+                                "animation-delay": "0.25s",
+                                "pointer_events": "none",
+                            },
+                        ),
+                        spacing="3",
+                        align="center",
+                        justify="center",
+                        padding_top="40px",
+                        padding_bottom="20px",
+                    ),
+                    width="100%",
+                    background="transparent",
+                    position="relative",
+                    left="0",
+                    z_index="10",
+                    pointer_events="none",
                 ),
-                rx.text(
-                    "오늘 사용한 물 관련 활동을 모두 선택해주세요",
-                    color="#666666",
-                    font_size="1.15em",
-                    font_weight="400",
-                    margin_top="8px",
-                ),
-
-                rx.box(height="40px"),
-
+                # 실제 콘텐츠
+                rx.box(
+                    rx.card(
+                        rx.vstack(
                 # 선택 버튼
                 rx.hstack(
                     water_button("샤워", AppState.selected_shower, AppState.toggle_shower),
@@ -307,9 +272,85 @@ def water_page():
 
                 rx.box(height="20px"),
 
+                # 입력 필드 표시
+                rx.cond(
+                    AppState.water_input_mode,
+                    rx.form(
+                        rx.vstack(
+                            rx.cond(
+                                AppState.show_shower,
+                                shower_input_field()
+                            ),
+
+                            rx.cond(
+                                AppState.show_dish,
+                                water_input_field("설거지", "dish_count"),
+                            ),
+
+                            rx.cond(
+                                AppState.show_laundry,
+                                water_input_field("세탁", "laundry_count"),
+                            ),
+
+                            rx.box(height="30px"),
+
+                            # 버튼 영역
+                            rx.hstack(
+                                # 다시 선택하기 버튼
+                                rx.button(
+                                    "다시 선택하기",
+                                    type="button",
+                                    on_click=AppState.reset_water_selection,
+                                    color="#4DAB75",
+                                    background_color="transparent",
+                                    border_radius="30px",
+                                    padding="16px 40px",
+                                    border="1px solid rgba(77, 171, 117, 0.3)",
+                                    font_size="1.05em",
+                                    font_weight="600",
+                                    cursor="pointer",
+                                    transition="all 0.25s ease",
+                                    _hover={
+                                        "background_color": "rgba(77, 171, 117, 0.05)",
+                                        "border": "1px solid #4DAB75",
+                                    },
+                                ),
+                                # 다음 버튼
+                rx.button(
+                                    "다음",
+                    type="submit",
+                                    color="#FFFFFF",
+                                    background_color="#4DAB75",
+                                    border_radius="30px",
+                                    padding="16px 52px",
+                                    border="none",
+                                    font_size="1.05em",
+                                    font_weight="600",
+                                    cursor="pointer",
+                                    box_shadow="0 4px 20px rgba(77, 171, 117, 0.3)",
+                                    transition="all 0.25s ease",
+                                    _hover={
+                                        "background_color": "#3d9a66",
+                                        "transform": "translateY(-2px)",
+                                        "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.5)",
+                                    },
+                ),
+                spacing="4",
+                                justify="center",
+                            ),
+                            align="center",
+                            width="100%",
+                            spacing="2",
+            ),
+            on_submit=AppState.handle_water_submit,
+                    ),
+                ),
+
+                rx.box(height="20px"),
+
                 # 입력하기 버튼 & 건너뛰기 버튼
                 rx.cond(
-                    AppState.water_input_mode == False,
+                    ~AppState.water_input_mode,
                     rx.hstack(
                         rx.button(
                             "건너뛰기",
@@ -352,98 +393,50 @@ def water_page():
                     ),
                 ),
 
-                rx.box(height="10px"),
-
-                # 입력 필드 표시
-                rx.cond(
-                    AppState.water_input_mode,
-                    rx.form(
-                        rx.vstack(
-                            rx.text(
-                                "사용 횟수/시간을 입력해주세요",
-                                color="#333333",
-                                font_size="1.25em",
-                                font_weight="700",
-                                margin_bottom="20px",
-                            ),
-
-                            rx.cond(
-                                AppState.show_shower,
-                                shower_input_field()
-                            ),
-
-                            rx.cond(
-                                AppState.show_dish,
-                                water_input_field("설거지", "dish_count"),
-                            ),
-
-                            rx.cond(
-                                AppState.show_laundry,
-                                water_input_field("세탁", "laundry_count"),
-                            ),
-
-                            rx.box(height="30px"),
-
-                            # 버튼 영역
-                            rx.hstack(
-                                # 다시 선택하기 버튼
-                                rx.button(
-                                    "다시 선택하기",
-                                    type="button",
-                                    on_click=AppState.reset_water_selection,
-                                    color="#4DAB75",
-                                    background_color="transparent",
-                                    border_radius="30px",
-                                    padding="16px 40px",
-                                    border="1px solid rgba(77, 171, 117, 0.3)",
-                                    font_size="1.05em",
-                                    font_weight="600",
-                                    cursor="pointer",
-                                    transition="all 0.25s ease",
-                                    _hover={
-                                        "background_color": "rgba(77, 171, 117, 0.05)",
-                                        "border": "1px solid #4DAB75",
-                                    },
-                                ),
-                                # 다음 버튼
-                                rx.button(
-                                    "다음",
-                                    type="submit",
-                                    color="#FFFFFF",
-                                    background_color="#4DAB75",
-                                    border_radius="30px",
-                                    padding="16px 52px",
-                                    border="none",
-                                    font_size="1.05em",
-                                    font_weight="600",
-                                    cursor="pointer",
-                                    box_shadow="0 4px 20px rgba(77, 171, 117, 0.3)",
-                                    transition="all 0.25s ease",
-                                    _hover={
-                                        "background_color": "#3d9a66",
-                                        "transform": "translateY(-2px)",
-                                        "box_shadow": "0 6px 24px rgba(77, 171, 117, 0.5)",
-                                    },
-                                ),
-                                spacing="4",
-                                justify="center",
-                            ),
+                            spacing="5",
                             align="center",
                             width="100%",
-                            spacing="2",
                         ),
-                        on_submit=AppState.handle_water_submit,
+                        width="100%",
+                        background="white",
+                        border="1px solid rgba(0,0,0,0.1)",
+                        box_shadow="0 4px 12px rgba(0,0,0,0.1)",
+                        padding="40px",
+                        max_width="900px",
                     ),
+                    width="100%",
+                    z_index="2",
+                    padding="40px 20px",
+                    display="flex",
+                    justify_content="center",
+                    align_items="flex-start",
+                    min_height="calc(100vh - 100px)",
+                    margin_top="0",
+                    padding_top="20px",
                 ),
-
-                spacing="5",
-                align="center",
-                padding="60px 40px",
             ),
-            max_width="900px",
-            margin="0 auto",
+            help_modal("물"),
         ),
-        min_height="100vh",
-        background="#F8F9FA",
+        rx.box(
+            header(),
+            rx.center(
+                rx.vstack(
+                    rx.heading("로그인이 필요합니다", size="7", color="white", font_weight="bold"),
+                    rx.button(
+                        "로그인하기",
+                        on_click=rx.redirect("/auth"),
+                        color_scheme="green",
+                        size="3",
+                        margin_top="20px",
+                    ),
+                    spacing="4",
+        align="center",
+                ),
+                width="100%",
+                min_height="calc(100vh - 80px)",
+            ),
+            spacing="0",
+            width="100%",
+            min_height="100vh",
         ),
     )

@@ -18,15 +18,11 @@ load_dotenv(override=True) # 프로젝트 루트(OpenSourceProject/.env)에서 �
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # .env에서 키 읽기
 MODEL_NAME = "gemini-flash-latest"
 
-# 🔍 디버그용: 키 앞부분만 찍어보기 (None일 때도 안전하게)
-key_prefix = GEMINI_API_KEY[:8] if GEMINI_API_KEY else "NONE"
-print(f"[DEBUG] llm_service loaded. GEMINI_API_KEY prefix: {key_prefix}")
-logger.info(f"[llm_service] GEMINI_API_KEY prefix: {key_prefix}")
-
+# 키 존재 여부만 로깅 (민감정보 미노출)
 if not GEMINI_API_KEY:
     logger.error("[llm_service] ❌ GEMINI_API_KEY 환경변수가 없습니다. .env 파일을 확인하세요.")
 else:
-    logger.info("[llm_service] 🔑 Gemini API Key 로드 성공")
+    logger.info("[llm_service] 🔑 Gemini API Key 로드 확인")
 
 # -------------------------------
 # 2) Gemini SDK 로딩
@@ -194,7 +190,29 @@ def call_llm_api(prompt: str, user_data: Dict[str, Any]) -> str:
     try:
         model = genai.GenerativeModel(MODEL_NAME)
         response = model.generate_content(prompt)
-        raw_text = (response.text or "").strip()
+        # 응답 텍스트 안전 추출 (candidates/parts 우선)
+        raw_text = ""
+        try:
+            if hasattr(response, "candidates") and response.candidates:
+                for cand in response.candidates:
+                    parts = getattr(cand, "content", None) or getattr(cand, "parts", None)
+                    if parts and hasattr(parts, "__iter__"):
+                        texts = [
+                            getattr(p, "text", None) or str(getattr(p, "data", "")) or ""
+                            for p in parts
+                            if p is not None
+                        ]
+                        joined = "\n".join([t for t in texts if t]).strip()
+                        if joined:
+                            raw_text = joined
+                            break
+            if not raw_text:
+                raw_text = (getattr(response, "text", None) or "").strip()
+        except Exception:
+            raw_text = (getattr(response, "text", None) or "").strip()
+
+        if not raw_text:
+            raise ValueError("LLM 응답에 텍스트가 없습니다.")
 
         # 코드블록(```) 제거
         if raw_text.startswith("```"):
@@ -274,6 +292,22 @@ def create_coaching_prompt(
         indent=2,
     )
 
+    policy_candidates = user_data.get("policy_candidates") or []
+    policy_text = ""
+    if isinstance(policy_candidates, list) and policy_candidates:
+        lines = []
+        for p in policy_candidates:
+            if not isinstance(p, dict):
+                continue
+            name = p.get("name")
+            reason = p.get("reason")
+            url = p.get("url")
+            if name or reason or url:
+                line = f"- 이름: {name or ''} | 설명: {reason or ''} | 링크: {url or ''}"
+                lines.append(line)
+        if lines:
+            policy_text = "\n".join(lines)
+
     # 최종 프롬프트 구성
     prompt = f"""
 {system_instruction}
@@ -290,6 +324,11 @@ def create_coaching_prompt(
 
 JSON 스키마:
 {json_schema}
+
+[정책/혜택 후보 목록]
+아래 목록 안에서만 정책/혜택을 선택해 policy_recommendations를 작성하세요.
+목록에 없는 정책 이름을 새로 만들지 마세요.
+{policy_text or '- 제공된 정책 후보 없음'}
 
 [추가 조건]
 - 한국어로 작성.
